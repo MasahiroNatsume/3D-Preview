@@ -165,7 +165,7 @@ const wrap = $('canvasWrap');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 0.92;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 wrap.appendChild(renderer.domElement);
@@ -174,14 +174,14 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#f2f2f2');
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.65;
+scene.environmentIntensity = 0.38;
 
 const persp = new THREE.PerspectiveCamera(35, 1, 0.1, 10000);
 const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -10000, 10000);
 const controls = new BlenderControls(persp, ortho, renderer.domElement);
 
 // メインライト（影を投影する指向性ライト）
-const light = new THREE.DirectionalLight(0xffffff, 1.8);
+const light = new THREE.DirectionalLight(0xffffff, 1.15);
 light.castShadow = true;
 light.shadow.mapSize.width = 2048;
 light.shadow.mapSize.height = 2048;
@@ -191,15 +191,11 @@ light.shadow.bias = -0.00015;
 light.shadow.normalBias = 0.04;
 scene.add(light, light.target);
 
-// 補助ライト（反対側からの淡い光で暗部を持ち上げる）
-const fillLight = new THREE.DirectionalLight(0xedf1f8, 0.45);
+// 補助ライト（暗部のつぶれを防ぐ柔らかな光）
+const fillLight = new THREE.DirectionalLight(0xe8ecf2, 0.18);
 scene.add(fillLight);
 
-// リムライト（エッジの光沢を際立たせる）
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.35);
-scene.add(rimLight);
-
-const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d4dc, 0.28);
+const hemi = new THREE.HemisphereLight(0xffffff, 0xcfd4dc, 0.25);
 scene.add(hemi);
 
 const group = new THREE.Group();
@@ -461,14 +457,16 @@ function applyVarnish(on) {
   if (state.isModelMode && modelRoot) {
     modelRoot.traverse((child) => {
       if (child.isMesh && child.material && child.material.isMeshPhysicalMaterial) {
-        child.material.clearcoat = on ? 1.0 : 0.0;
-        child.material.roughness = on ? 0.28 : 0.58;
+        child.material.clearcoat = on ? 0.38 : 0.0;
+        child.material.clearcoatRoughness = 0.20;
+        child.material.roughness = on ? 0.42 : 0.65;
         child.material.needsUpdate = true;
       }
     });
   } else if (material) {
-    material.clearcoat = on ? 1.0 : 0.0;
-    material.roughness = on ? 0.30 : 0.62;
+    material.clearcoat = on ? 0.38 : 0.0;
+    material.clearcoatRoughness = 0.20;
+    material.roughness = on ? 0.42 : 0.65;
     material.needsUpdate = true;
   }
   requestRender();
@@ -494,14 +492,13 @@ function updateLight() {
     );
     light.target.position.copy(center);
   }
-  light.intensity = +$('lightInt').value;
+  // 白飛びしないようライト強度のベースを適正化
+  light.intensity = +$('lightInt').value * 0.75;
   light.castShadow = state.shadowOn;
 
-  // 補助光・リム光の同期
-  fillLight.position.set(-light.position.x * 0.7, -light.position.y * 0.7, R * 0.5);
+  // 補助光の同期
+  fillLight.position.set(-light.position.x * 0.6, -light.position.y * 0.6, R * 0.5);
   fillLight.target.position.copy(center);
-  rimLight.position.set(light.position.y * 0.6, -light.position.x * 0.6, R * 0.7);
-  rimLight.target.position.copy(center);
 
   // シャドウカメラの範囲をシーンサイズに合わせて更新
   const maxDim = Math.max(state.widthMm, state.heightMm, 150) * 0.85;
@@ -731,10 +728,9 @@ async function setupModelMode(modelUrl, manifest) {
             normalMap = createNormalMapFromImage(orig.map.image, 2.5);
           } else {
             orig.map.image.addEventListener('load', () => {
-              const nm = createNormalMapFromImage(orig.map.image, 2.5);
+              const nm = createNormalMapFromImage(orig.map.image, 2.0);
               if (nm) {
                 upgraded.normalMap = nm;
-                upgraded.clearcoatNormalMap = nm;
                 upgraded.needsUpdate = true;
                 requestRender();
               }
@@ -744,15 +740,14 @@ async function setupModelMode(modelUrl, manifest) {
         const upgraded = new THREE.MeshPhysicalMaterial({
           map: orig.map || null,
           color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
-          roughness: 0.28,             // UV印刷インクのしっとりしたツヤ
+          roughness: 0.45,             // UVインクの自然なマット〜半光沢（白飛び防止）
           metalness: 0.0,
           normalMap: normalMap,
-          normalScale: new THREE.Vector2(0.9, 0.9),
-          clearcoat: 1.0,              // 表面のクリアニス層
-          clearcoatRoughness: 0.06,    // ニス層のシャープなツヤ
-          clearcoatNormalMap: normalMap,
-          ior: 1.52,                   // UV印刷インクの屈折率
-          specularIntensity: 1.0,
+          normalScale: new THREE.Vector2(0.35, 0.35), // 適度なエッジ凹凸
+          clearcoat: state.varnishOn ? 0.38 : 0.0,    // 上品なニス層（斜めからの白飛びを防止）
+          clearcoatRoughness: 0.20,    // ハイライトの自然な拡散
+          ior: 1.48,                   // 印刷インクの屈折率
+          specularIntensity: 0.35,     // 正反射の白飛びを抑制
         });
         modelOriginalMaterials.set(child, upgraded);
         child.material = upgraded;
@@ -872,15 +867,15 @@ async function main() {
 
   material = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.30,
+    roughness: 0.45,
     metalness: 0,
     normalMap: normalTex,
-    clearcoat: varnishTex ? 1 : 0,
+    normalScale: new THREE.Vector2(0.4, 0.4),
+    clearcoat: varnishTex ? 0.38 : 0,
     clearcoatMap: varnishTex || null,
-    clearcoatRoughness: 0.06,
-    clearcoatNormalMap: normalTex,
-    specularIntensity: 1.0,
-    ior: 1.52,
+    clearcoatRoughness: 0.20,
+    specularIntensity: 0.35,
+    ior: 1.48,
   });
   heightMaterial = new THREE.MeshBasicMaterial({ map: heightTex, toneMapped: false });
   skirtMaterial = new THREE.MeshStandardMaterial({ color: 0xf3f3f3, roughness: 0.7, side: THREE.DoubleSide });
