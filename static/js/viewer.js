@@ -713,19 +713,29 @@ async function setupModelMode(modelUrl, manifest) {
   modelRoot.updateMatrixWorld(true);
 
   // メッシュの法線再計算、シャドウ、厚盛りPhysicalMaterialへのアップグレード
+  let normalZSum = 0;
+  let normalCount = 0;
+
   modelRoot.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
       if (child.geometry) {
         child.geometry.computeVertexNormals();
+        const norm = child.geometry.attributes.normal;
+        if (norm) {
+          for (let i = 2; i < norm.count * 3; i += 3) {
+            normalZSum += norm.array[i];
+            normalCount++;
+          }
+        }
       }
       const orig = child.material;
       if (orig) {
         let normalMap = null;
         if (orig.map && orig.map.image) {
           if (orig.map.image.complete || orig.map.image.width) {
-            normalMap = createNormalMapFromImage(orig.map.image, 2.5);
+            normalMap = createNormalMapFromImage(orig.map.image, 2.0);
           } else {
             orig.map.image.addEventListener('load', () => {
               const nm = createNormalMapFromImage(orig.map.image, 2.0);
@@ -736,6 +746,10 @@ async function setupModelMode(modelUrl, manifest) {
               }
             });
           }
+        }
+        if (orig.map) {
+          orig.map.colorSpace = THREE.SRGBColorSpace;
+          orig.map.needsUpdate = true;
         }
         const upgraded = new THREE.MeshPhysicalMaterial({
           map: orig.map || null,
@@ -748,12 +762,19 @@ async function setupModelMode(modelUrl, manifest) {
           clearcoatRoughness: 0.20,    // ハイライトの自然な拡散
           ior: 1.48,                   // 印刷インクの屈折率
           specularIntensity: 0.35,     // 正反射の白飛びを抑制
+          side: THREE.DoubleSide,      // 裏面カリングによる白化を防止
         });
         modelOriginalMaterials.set(child, upgraded);
         child.material = upgraded;
       }
     }
   });
+
+  // 表面法線が下向き（裏返し）の場合、X軸で180度反転させて表面を上（+Z：カメラ側）に向ける
+  if (normalCount > 0 && (normalZSum / normalCount) < 0) {
+    modelRoot.rotation.x += Math.PI;
+    modelRoot.updateMatrixWorld(true);
+  }
 
   // 再計算して底面を Z=0、中心(X,Y)を (0,0) に配置
   box = new THREE.Box3().setFromObject(modelRoot);
