@@ -17,12 +17,13 @@ const GRID_MAX = IS_MOBILE ? 256 : 512;     // メッシュ分割数（長辺）
 const COLOR_MAX = IS_MOBILE ? 2048 : 4096;  // カラーテクスチャ（長辺）
 
 const DEFAULT_LAYER = {
+  heightmap: { max_height_mm: 1.2 },
   base: { max_height_mm: 1.0 },
   texture: { max_height_mm: 0.2 },
   varnish: { max_height_mm: 0 },
   color: {},
 };
-const LAYER_LABEL = { base: 'Base', texture: 'Texture', color: 'Color', varnish: 'Varnish' };
+const LAYER_LABEL = { heightmap: 'Heightmap', base: 'Base', texture: 'Texture', color: 'Color', varnish: 'Varnish' };
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,14 +36,16 @@ const state = {
   modelBaseScaleZ: 1,
   W: 0, H: 0,           // フィールド解像度
   widthMm: 300, heightMm: 200,
-  fields: {},           // base / texture / varnish : Float32Array(0..1)
-  hField: null,         // 合成高さ Float32Array (mm)
+  fields: {},           // base / texture / varnish / heightmap : Float32Array(0..1)
+  rawHField: null,      // 理想の線形合成高さ Float32Array (mm)
+  hField: null,         // 現在表示中の高さ Float32Array (mm)
   maxHeight: 0,
   exag: 1,
   normalExag: 1,
   textureOn: true,
   shadowOn: true,
   aoOn: true,
+  realPrintSim: true,   // 実機シミュレーション（盛り下がり・エッジダレ・硬化収縮再現）
   varnishOn: true,
   mode: 'color',
 };
@@ -283,22 +286,98 @@ function layerCfg(name) {
   return merged;
 }
 
+/**
+ * UV厚盛り印刷の実機物理挙動シミュレーション（ヤマテ技術仕様書準拠）
+ * 1. 非線形な沈降・盛り下がり（濃度50%→実測30%高さ、γ ≈ 1.737）
+ * 2. 液体インクの表面張力とレベリングによるエッジのR曲面・ダレ（R ≈ 0.3mm）
+ * 3. 厚盛り部の硬化収縮（大面積ベタの微小引き締まり）
+ */
+function simulateRealPrintHeight(rawField, W, H, maxMm) {
+  const n = W * H;
+  const sim = new Float32Array(n);
+  if (maxMm <= 0.0001) return sim;
+
+  // 1. ヤマテ実測非線形カーブ（50%濃度で実測30%高さに沈降する盛り下がり特性）
+  const GAMMA = 1.737;
+  for (let i = 0; i < n; i++) {
+    const v = rawField[i] / maxMm;
+    if (v > 0) {
+      sim[i] = Math.pow(Math.min(1, Math.max(0, v)), GAMMA) * maxMm;
+    }
+  }
+
+  // 2. インクのダレ・エッジのR付け（急激な崖を丸める表面張力フィルター）
+  const pxMm = state.widthMm / W;
+  const rad = Math.max(1, Math.min(6, Math.round(0.3 / pxMm)));
+  const temp = new Float32Array(n);
+
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      let sum = 0, weight = 0;
+      for (let dx = -rad; dx <= rad; dx++) {
+        const nx = Math.min(W - 1, Math.max(0, x + dx));
+        const w = 1 - Math.abs(dx) / (rad + 1);
+        sum += sim[row + nx] * w;
+        weight += w;
+      }
+      temp[row + x] = sum / weight;
+    }
+  }
+
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      let sum = 0, weight = 0;
+      for (let dy = -rad; dy <= rad; dy++) {
+        const ny = Math.min(H - 1, Math.max(0, y + dy));
+        const w = 1 - Math.abs(dy) / (rad + 1);
+        sum += temp[ny * W + x] * w;
+        weight += w;
+      }
+      const orig = sim[y * W + x];
+      const blurred = sum / weight;
+      // エッジの曲面化（R付け）と硬化収縮
+      sim[y * W + x] = (orig * 0.45 + blurred * 0.55) * 0.985;
+    }
+  }
+
+  return sim;
+}
+
 function composeHeight() {
   const n = state.W * state.H;
-  const out = state.hField || new Float32Array(n);
-  out.fill(0);
+  if (!state.rawHField || state.rawHField.length !== n) {
+    state.rawHField = new Float32Array(n);
+  }
+  const raw = state.rawHField;
+  raw.fill(0);
+
   const add = (name) => {
     const f = state.fields[name];
     const mm = Number(layerCfg(name).max_height_mm) || 0;
     if (!f || !mm) return;
-    for (let i = 0; i < n; i++) out[i] += f[i] * mm;
+    for (let i = 0; i < n; i++) raw[i] += f[i] * mm;
   };
-  add('base');
-  if (state.textureOn) add('texture');
-  add('varnish');
+
+  if (state.fields.heightmap) {
+    add('heightmap');
+  } else {
+    add('base');
+    if (state.textureOn) add('texture');
+    add('varnish');
+  }
+
+  let rawMax = 0;
+  for (let i = 0; i < n; i++) if (raw[i] > rawMax) rawMax = raw[i];
+
+  if (state.realPrintSim) {
+    state.hField = simulateRealPrintHeight(raw, state.W, state.H, rawMax);
+  } else {
+    state.hField = raw.slice();
+  }
+
   let max = 0;
-  for (let i = 0; i < n; i++) if (out[i] > max) max = out[i];
-  state.hField = out;
+  for (let i = 0; i < n; i++) if (state.hField[i] > max) max = state.hField[i];
   state.maxHeight = max;
 }
 
@@ -554,17 +633,26 @@ function setProgress(p, text) {
 function fmt(n, d = 2) { return (Math.round(n * 10 ** d) / 10 ** d).toFixed(d); }
 
 function updateHeightNote() {
+  const simTag = state.realPrintSim ? '【実機盛り下がり反映中】' : '【理想形状】';
+  if (state.isModelMode) {
+    $('heightNote').textContent = `厚み 約 ${fmt(state.maxHeight)} mm ${simTag}`;
+    return;
+  }
+  if (state.fields.heightmap) {
+    $('heightNote').textContent = `最大高さ 約 ${fmt(state.maxHeight)} mm（Heightmap ${fmt(+layerCfg('heightmap').max_height_mm || 0)}mm） ${simTag}`;
+    return;
+  }
   const parts = ['base', 'texture', 'varnish']
     .filter((k) => state.fields[k] && (k !== 'texture' || state.textureOn))
     .map((k) => `${LAYER_LABEL[k]} ${fmt(+layerCfg(k).max_height_mm || 0)}mm`);
-  $('heightNote').textContent = `最大高さ 約 ${fmt(state.maxHeight)} mm` + (parts.length ? `（${parts.join(' + ')}）` : '');
+  $('heightNote').textContent = `最大高さ 約 ${fmt(state.maxHeight)} mm` + (parts.length ? `（${parts.join(' + ')}）` : '') + ` ${simTag}`;
 }
 
 function buildSpec() {
   const cfg = state.config;
   const rows = [];
   rows.push(`<tr><th>サイズ</th><td colspan="4">${fmt(state.widthMm, 0)} × ${fmt(state.heightMm, 0)} mm</td></tr>`);
-  const layerRows = ['base', 'texture', 'color', 'varnish'].filter((k) => cfg.layers && cfg.layers[k]);
+  const layerRows = ['heightmap', 'base', 'texture', 'color', 'varnish'].filter((k) => cfg.layers && cfg.layers[k]);
   if (layerRows.length) {
     rows.push('<tr class="spec-head"><th>層</th><td>インク</td><td>濃度</td><td>積層</td><td>高さ</td></tr>');
     for (const k of layerRows) {
@@ -583,6 +671,18 @@ function bindUI() {
   document.querySelectorAll('#displayMode button').forEach((b) => b.addEventListener('click', () => {
     state.mode = b.dataset.mode; applyMode();
   }));
+  $('realPrintToggle')?.addEventListener('change', (e) => {
+    state.realPrintSim = e.target.checked;
+    if (state.isModelMode) {
+      applyModelPrintSim(state.realPrintSim);
+    } else {
+      composeHeight();
+      buildNormalMap(state.exag);
+      refreshHeightTex();
+      updateGeometry();
+      updateHeightNote();
+    }
+  });
   $('varnishToggle')?.addEventListener('change', (e) => applyVarnish(e.target.checked));
   $('shadowToggle')?.addEventListener('change', (e) => {
     state.shadowOn = e.target.checked;
@@ -757,6 +857,14 @@ async function setupModelMode(modelUrl, manifest) {
   modelRoot.traverse((child) => {
     if (child.isMesh) {
       if (child.geometry) {
+        if (child.geometry.attributes.position) {
+          const pos = child.geometry.attributes.position;
+          const origZ = new Float32Array(pos.count);
+          for (let i = 0; i < pos.count; i++) origZ[i] = pos.getZ(i);
+          child.geometry.userData.origZ = origZ;
+          child.geometry.computeBoundingBox();
+          child.geometry.userData.origBox = child.geometry.boundingBox.clone();
+        }
         child.geometry.computeVertexNormals();
         const norm = child.geometry.attributes.normal;
         if (norm) {
@@ -877,12 +985,17 @@ async function setupModelMode(modelUrl, manifest) {
   boardMesh.position.z = -t / 2;
   group.add(boardMesh);
 
+  // ヤマテ実機シミュレーション（初期状態適用）
+  if (state.realPrintSim) {
+    applyModelPrintSim(true);
+  }
+
   // UI調整
   $('textureToggle').closest('label').style.display = 'none';
   document.querySelector('[data-mode="original"]').style.display = 'none';
   document.querySelector('[data-mode="height"]').style.display = 'none';
 
-  $('heightNote').textContent = `厚み 約 ${fmt(state.maxHeight)} mm`;
+  updateHeightNote();
   applyMode();
   buildSpec();
   bindUI();
@@ -893,6 +1006,45 @@ async function setupModelMode(modelUrl, manifest) {
   loop();
   setProgress(1, '');
   $('loading').classList.add('is-done');
+}
+
+function applyModelPrintSim(simOn) {
+  if (!state.isModelMode || !modelRoot) return;
+  const GAMMA = 1.737;
+  modelRoot.traverse((child) => {
+    if (child.isMesh && child.geometry && child.geometry.userData.origZ) {
+      const pos = child.geometry.attributes.position;
+      const origZ = child.geometry.userData.origZ;
+      const box = child.geometry.userData.origBox;
+      if (!box) return;
+      const minZ = box.min.z;
+      const rangeZ = Math.max(0.0001, box.max.z - minZ);
+
+      for (let i = 0; i < pos.count; i++) {
+        const oz = origZ[i];
+        if (simOn) {
+          const norm = Math.max(0, Math.min(1, (oz - minZ) / rangeZ));
+          // ヤマテ実測非線形盛り下がり特性（50%濃度→30%高さ）
+          const sagged = Math.pow(norm, GAMMA);
+          pos.setZ(i, minZ + sagged * rangeZ * 0.985);
+        } else {
+          pos.setZ(i, oz);
+        }
+      }
+      pos.needsUpdate = true;
+      child.geometry.computeVertexNormals();
+      child.geometry.computeBoundingBox();
+      child.geometry.computeBoundingSphere();
+    }
+  });
+
+  const currentBox = new THREE.Box3().setFromObject(modelRoot);
+  modelRoot.position.z -= currentBox.min.z;
+  modelRoot.updateMatrixWorld(true);
+  const updatedBox = new THREE.Box3().setFromObject(modelRoot);
+  state.maxHeight = updatedBox.max.z - updatedBox.min.z;
+  updateHeightNote();
+  requestRender();
 }
 
 // ------------------------------------------------------------------ メイン
@@ -923,7 +1075,7 @@ async function main() {
   }));
 
   // 寸法
-  const ref = state.imgs.base || state.imgs.color || state.imgs.original || state.imgs.texture || state.imgs.varnish;
+  const ref = state.imgs.heightmap || state.imgs.base || state.imgs.color || state.imgs.original || state.imgs.texture || state.imgs.varnish;
   const imgAspect = ref.naturalWidth / ref.naturalHeight;
   const size = state.config.size_mm || {};
   state.widthMm = +size.width || (size.height ? +size.height * imgAspect : 300);
@@ -934,12 +1086,15 @@ async function main() {
   setProgress(0.65, '立体形状を計算しています…');
   await new Promise((r) => setTimeout(r, 20));
   const whiteIsHigh = state.config.white_is_high !== false;
-  for (const k of ['base', 'texture', 'varnish']) {
+  for (const k of ['heightmap', 'base', 'texture', 'varnish']) {
     if (state.imgs[k]) state.fields[k] = toField(state.imgs[k], W, H, { whiteIsHigh, ...layerCfg(k) });
   }
   if (!state.fields.texture) {
-    $('textureToggle').disabled = true;
-    $('textureToggle').closest('label').classList.add('is-disabled');
+    $('textureToggle')?.closest('label')?.classList.add('is-disabled');
+    if ($('textureToggle')) $('textureToggle').disabled = true;
+  }
+  if (state.fields.heightmap) {
+    $('textureToggle')?.closest('label')?.setAttribute('style', 'display: none;');
   }
   composeHeight();
 
@@ -950,10 +1105,15 @@ async function main() {
 
   // テクスチャ
   const maxTex = Math.min(COLOR_MAX, renderer.capabilities.maxTextureSize);
-  if (state.imgs.color) textures.color = colorTexture(state.imgs.color, maxTex);
+  const colorSrc = state.imgs.color || state.imgs.original || null;
+  if (colorSrc) textures.color = colorTexture(colorSrc, maxTex);
   if (state.imgs.original) textures.original = colorTexture(state.imgs.original, maxTex);
   if (state.fields.varnish) varnishTex = grayTexture(state.fields.varnish, W, H);
-  if (!textures.original) document.querySelector('[data-mode="original"]').disabled = true;
+  if (!textures.original) document.querySelector('[data-mode="original"]')?.setAttribute('disabled', 'true');
+  if (!textures.color) {
+    document.querySelector('[data-mode="color"]')?.setAttribute('disabled', 'true');
+    state.mode = 'clay';
+  }
   if (!varnishTex && $('varnishToggle')) { $('varnishToggle').disabled = true; $('varnishToggle').closest('label').classList.add('is-disabled'); }
 
   setProgress(0.9, 'メッシュを構築しています…');

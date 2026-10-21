@@ -28,6 +28,7 @@
   function guessName(file) {
     const n = file.name.toLowerCase();
     if (n.endsWith('.json')) return 'config.json';
+    if (n.includes('height') || n.includes('depth') || n.includes('hight') || n.includes('disp')) return 'heightmap.png';
     for (const k of ['original', 'base', 'texture', 'color', 'varnish']) if (n.includes(k)) return `${k}.png`;
     return null;
   }
@@ -77,13 +78,17 @@
     if (num('width') && !cfg.size_mm.width) cfg.size_mm.width = num('width');
     if (num('height') && !cfg.size_mm.height) cfg.size_mm.height = num('height');
     cfg.layers = cfg.layers || {};
+    if (num('heightmapH') != null) cfg.layers.heightmap = { max_height_mm: num('heightmapH'), ...cfg.layers.heightmap };
     if (num('baseH') != null) cfg.layers.base = { max_height_mm: num('baseH'), ...cfg.layers.base };
     if (num('texH') != null) cfg.layers.texture = { max_height_mm: num('texH'), ...cfg.layers.texture };
     return cfg;
   }
 
   $('submitBtn').addEventListener('click', async () => {
-    if (!files['base.png'] && !files['texture.png']) { status('Base（または Texture）画像を選択してください', true); return; }
+    if (!files['heightmap.png'] && !files['base.png'] && !files['texture.png']) {
+      status('Heightmap（ハイトマップ）、または Base / Texture 画像を選択してください', true);
+      return;
+    }
     const btn = $('submitBtn');
     btn.disabled = true;
     try {

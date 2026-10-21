@@ -128,6 +128,12 @@ a { color: inherit; }
 .check input:checked::after { content: ''; width: 8px; height: 4px; border: 2px solid var(--white); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
 .check.is-disabled { color: #c5c5c5; cursor: not-allowed; }
 .check.is-disabled input { border-color: #c5c5c5; background: var(--white); }
+.check.is-sim {
+  padding: 6px 8px; margin: 6px 0 8px;
+  background: #f7f7f7; border-left: 2px solid var(--black);
+  font-weight: 500;
+}
+body.is-dark .check.is-sim { background: #262626; border-left-color: #fff; }
 
 .range { margin-bottom: 12px; }
 .range-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }

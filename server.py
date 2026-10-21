@@ -44,6 +44,7 @@ LAYER_FILES = {
     "texture": "texture.png",
     "color": "color.png",
     "varnish": "varnish.png",
+    "heightmap": "heightmap.png",
 }
 MODEL_FILES = {"model.glb", "model.gltf", "model.obj", "model.mtl"}
 ALLOWED_FILES = set(LAYER_FILES.values()) | {"config.json"} | MODEL_FILES

@@ -34,20 +34,22 @@
         <div class="form-row"><label for="title"><span class="en">Title</span>案件名</label><input type="text" id="title" placeholder="例）〇〇様 店頭サイン"></div>
         <div class="form-row"><label for="width"><span class="en">Width</span>幅 (mm)</label><input type="number" id="width" min="1" step="0.1" placeholder="300"></div>
         <div class="form-row"><label for="height"><span class="en">Height</span>高さ (mm)</label><input type="number" id="height" min="1" step="0.1" placeholder="画像比率から自動"></div>
+        <div class="form-row"><label for="heightmapH"><span class="en">Heightmap</span>最大高さ (mm)</label><input type="number" id="heightmapH" min="0" step="0.01" placeholder="1.2"></div>
         <div class="form-row"><label for="baseH"><span class="en">Base</span>最大高さ (mm)</label><input type="number" id="baseH" min="0" step="0.01" placeholder="1.0"></div>
         <div class="form-row"><label for="texH"><span class="en">Texture</span>最大高さ (mm)</label><input type="number" id="texH" min="0" step="0.01" placeholder="0.2"></div>
         <div class="form-row"><label for="expires"><span class="en">Expires</span>有効期限（日・空欄で無期限）</label><input type="number" id="expires" min="1" step="1" placeholder="例）30"></div>
       </div>
 
       <div class="drop-grid">
-        <label class="drop" data-name="base.png"><span class="req">Required</span><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Base</b><small>base.png｜大きな立体形状</small></span></label>
+        <label class="drop" data-name="heightmap.png"><span class="req">Heightmap</span><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Heightmap</b><small>heightmap.png｜ハイトマップ（白=高）</small></span></label>
+        <label class="drop" data-name="base.png"><span class="req">Layer Base</span><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Base</b><small>base.png｜大きな立体形状</small></span></label>
         <label class="drop" data-name="texture.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Texture</b><small>texture.png｜細かな凹凸</small></span></label>
         <label class="drop" data-name="color.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Color</b><small>color.png｜表面の色</small></span></label>
         <label class="drop" data-name="varnish.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Varnish</b><small>varnish.png｜艶（白 = ニスあり）</small></span></label>
         <label class="drop" data-name="original.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Original</b><small>original.png｜元画像</small></span></label>
         <label class="drop" data-name="config.json"><input type="file" accept="application/json,.json"><span class="drop-label"><b>Config</b><small>config.json｜印刷条件（任意）</small></span></label>
       </div>
-      <p class="status">ファイルをまとめてこのエリアにドラッグ＆ドロップすると、ファイル名から自動で振り分けます。config.json がある場合はその値が優先されます。</p>
+      <p class="status">ハイトマップ（heightmap.png）またはレイヤーデータ（base / texture / color / varnish）をアップロードできます。ファイルをまとめてこのエリアにドラッグ＆ドロップすると自動で振り分けます。</p>
 
       <div class="actions">
         <button class="btn-line is-solid" id="submitBtn"><span>Create Link</span><small>共有リンクを発行</small></button>
