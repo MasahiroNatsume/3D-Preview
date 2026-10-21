@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { BlenderControls } from './controls.js';
 
 // ------------------------------------------------------------------ 定数
@@ -36,6 +40,9 @@ const state = {
   exag: 1,
   normalExag: 1,
   textureOn: true,
+  shadowOn: true,
+  aoOn: true,
+  varnishOn: true,
   mode: 'color',
 };
 
@@ -109,32 +116,90 @@ function dataTex(data, w, h) {
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.generateMipmaps = true;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 4;
   tex.needsUpdate = true;
   return tex;
 }
 
+/** 画像からリアルタイムに法線マップを生成（エッジの微細な凹凸とハイライトを強調） */
+function createNormalMapFromImage(img, bumpScale = 2.0) {
+  try {
+    const nw = img.naturalWidth || img.videoWidth || img.width;
+    const nh = img.naturalHeight || img.videoHeight || img.height;
+    if (!nw || !nh) return null;
+    const [w, h] = fitSize(nw, nh, 1024);
+    const canvas = drawToCanvas(img, w, h);
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const gray = new Float32Array(w * h);
+    for (let i = 0, j = 0; i < gray.length; i++, j += 4) {
+      gray[i] = (0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2]) / 255;
+    }
+    const normalData = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y++) {
+      const yu = Math.max(0, y - 1), yd = Math.min(h - 1, y + 1);
+      const row = (h - 1 - y) * w;
+      for (let x = 0; x < w; x++) {
+        const xl = Math.max(0, x - 1), xr = Math.min(w - 1, x + 1);
+        const gx = (gray[y * w + xr] - gray[y * w + xl]) * bumpScale;
+        const gy = (gray[yd * w + x] - gray[yu * w + x]) * bumpScale;
+        let nx = -gx, ny = gy, nz = 1.0;
+        const inv = 1 / Math.hypot(nx, ny, nz);
+        const o = (row + x) * 4;
+        normalData[o] = Math.round((nx * inv * 0.5 + 0.5) * 255);
+        normalData[o + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+        normalData[o + 2] = Math.round((nz * inv * 0.5 + 0.5) * 255);
+        normalData[o + 3] = 255;
+      }
+    }
+    return dataTex(normalData, w, h);
+  } catch (e) {
+    console.warn('法線マップ生成スキップ:', e);
+    return null;
+  }
+}
+
 // ------------------------------------------------------------------ Three.js 初期化
 const wrap = $('canvasWrap');
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 wrap.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#f2f2f2');
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.55;
+scene.environmentIntensity = 0.65;
 
 const persp = new THREE.PerspectiveCamera(35, 1, 0.1, 10000);
 const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -10000, 10000);
 const controls = new BlenderControls(persp, ortho, renderer.domElement);
 
-const light = new THREE.DirectionalLight(0xffffff, 1.6);
+// メインライト（影を投影する指向性ライト）
+const light = new THREE.DirectionalLight(0xffffff, 1.8);
+light.castShadow = true;
+light.shadow.mapSize.width = 2048;
+light.shadow.mapSize.height = 2048;
+light.shadow.camera.near = 10;
+light.shadow.camera.far = 3000;
+light.shadow.bias = -0.00015;
+light.shadow.normalBias = 0.04;
 scene.add(light, light.target);
-const hemi = new THREE.HemisphereLight(0xffffff, 0xdddddd, 0.25);
+
+// 補助ライト（反対側からの淡い光で暗部を持ち上げる）
+const fillLight = new THREE.DirectionalLight(0xedf1f8, 0.45);
+scene.add(fillLight);
+
+// リムライト（エッジの光沢を際立たせる）
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.35);
+scene.add(rimLight);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d4dc, 0.28);
 scene.add(hemi);
 
 const group = new THREE.Group();
@@ -144,6 +209,33 @@ let reliefMesh, skirtMesh, boardMesh, material, heightMaterial, skirtMaterial;
 let geo, skirtGeo, normalTex, heightTex, varnishTex;
 const textures = {};
 
+// ------------------------------------------------------------------ ポストプロセッシング (GTAO)
+let composer = null;
+let renderPass = null;
+let gtaoPass = null;
+let outputPass = null;
+
+try {
+  composer = new EffectComposer(renderer);
+  renderPass = new RenderPass(scene, controls.camera);
+  composer.addPass(renderPass);
+
+  const initW = wrap.clientWidth || window.innerWidth;
+  const initH = wrap.clientHeight || window.innerHeight;
+  gtaoPass = new GTAOPass(scene, controls.camera, initW, initH);
+  gtaoPass.output = GTAOPass.OUTPUT.Default;
+  gtaoPass.blendIntensity = 1.35;
+  gtaoPass.radius = 14;
+  gtaoPass.distanceFallOff = 1.0;
+  composer.addPass(gtaoPass);
+
+  outputPass = new OutputPass();
+  composer.addPass(outputPass);
+} catch (err) {
+  console.warn('Postprocessing could not be initialized:', err);
+  composer = null;
+}
+
 let needsRender = true;
 const requestRender = () => { needsRender = true; };
 controls.addEventListener('change', () => { updateLight(); requestRender(); });
@@ -151,21 +243,37 @@ controls.addEventListener('frame', () => frameAll());
 controls.addEventListener('projection', () => {
   $('orthoLabel').textContent = controls.isOrtho ? 'Ortho' : 'Persp';
   $('orthoBtn').classList.toggle('is-active', controls.isOrtho);
+  if (renderPass) renderPass.camera = controls.camera;
+  if (gtaoPass) gtaoPass.camera = controls.camera;
+  requestRender();
 });
 
 function resize() {
   const w = wrap.clientWidth, h = wrap.clientHeight;
   renderer.setSize(w, h, false);
+  if (composer) {
+    composer.setSize(w, h);
+    if (gtaoPass) gtaoPass.setSize(w, h);
+  }
   persp.aspect = w / Math.max(1, h);
   controls.update();
+  requestRender();
 }
 new ResizeObserver(resize).observe(wrap);
+
+function renderScene() {
+  if (state.aoOn && composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, controls.camera);
+  }
+}
 
 function loop() {
   requestAnimationFrame(loop);
   if (!needsRender) return;
   needsRender = false;
-  renderer.render(scene, controls.camera);
+  renderScene();
 }
 
 // ------------------------------------------------------------------ 高さ計算
@@ -296,7 +404,14 @@ function updateGeometry() {
 
 // ------------------------------------------------------------------ マテリアル
 const modelOriginalMaterials = new Map();
-const clayMaterial = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.7 });
+const clayMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xf5f5f7,
+  roughness: 0.32,
+  metalness: 0.0,
+  clearcoat: 0.45,
+  clearcoatRoughness: 0.12,
+  reflectivity: 0.5,
+});
 
 function applyMode() {
   const m = state.mode;
@@ -307,6 +422,12 @@ function applyMode() {
           modelOriginalMaterials.set(child, child.material);
         }
         if (m === 'clay' || m === 'height') {
+          const orig = modelOriginalMaterials.get(child);
+          if (orig && orig.normalMap) {
+            clayMaterial.normalMap = orig.normalMap;
+            clayMaterial.clearcoatNormalMap = orig.clearcoatNormalMap;
+            clayMaterial.needsUpdate = true;
+          }
           child.material = clayMaterial;
         } else {
           child.material = modelOriginalMaterials.get(child);
@@ -318,9 +439,16 @@ function applyMode() {
       reliefMesh.material = heightMaterial;
     } else {
       reliefMesh.material = material;
-      if (m === 'color') { material.map = textures.color || textures.original || null; material.color.set('#ffffff'); }
-      else if (m === 'original') { material.map = textures.original || textures.color || null; material.color.set('#ffffff'); }
-      else { material.map = null; material.color.set('#ececec'); }
+      if (m === 'color') {
+        material.map = textures.color || textures.original || null;
+        material.color.set('#ffffff');
+      } else if (m === 'original') {
+        material.map = textures.original || textures.color || null;
+        material.color.set('#ffffff');
+      } else {
+        material.map = null;
+        material.color.set('#f5f5f7');
+      }
       material.needsUpdate = true;
     }
   }
@@ -329,9 +457,18 @@ function applyMode() {
 }
 
 function applyVarnish(on) {
-  const has = !!varnishTex;
-  if (material) {
-    material.clearcoat = on && has ? 1 : 0;
+  state.varnishOn = on;
+  if (state.isModelMode && modelRoot) {
+    modelRoot.traverse((child) => {
+      if (child.isMesh && child.material && child.material.isMeshPhysicalMaterial) {
+        child.material.clearcoat = on ? 1.0 : 0.0;
+        child.material.roughness = on ? 0.28 : 0.58;
+        child.material.needsUpdate = true;
+      }
+    });
+  } else if (material) {
+    material.clearcoat = on ? 1.0 : 0.0;
+    material.roughness = on ? 0.30 : 0.62;
     material.needsUpdate = true;
   }
   requestRender();
@@ -339,21 +476,40 @@ function applyVarnish(on) {
 
 // ------------------------------------------------------------------ ライト
 function updateLight() {
-  const center = new THREE.Vector3(0, 0, 0);
-  const R = Math.max(state.widthMm, state.heightMm || 1) * 2;
+  const center = controls.target || new THREE.Vector3(0, 0, 0);
+  const R = Math.max(state.widthMm, state.heightMm || 1) * 2.2;
   if ($('lightFollow').checked) {
     const cam = controls.camera;
     const q = cam.quaternion;
     const dir = new THREE.Vector3(-0.35, 0.45, 1).normalize().applyQuaternion(q);
-    light.position.copy(controls.target).addScaledVector(dir, R);
-    light.target.position.copy(controls.target);
+    light.position.copy(center).addScaledVector(dir, R);
+    light.target.position.copy(center);
   } else {
     const az = THREE.MathUtils.degToRad(+$('lightAz').value);
     const el = THREE.MathUtils.degToRad(+$('lightEl').value);
-    light.position.set(Math.sin(az) * Math.cos(el), Math.cos(az) * Math.cos(el), Math.sin(el)).multiplyScalar(R);
+    light.position.set(
+      center.x + Math.sin(az) * Math.cos(el) * R,
+      center.y + Math.cos(az) * Math.cos(el) * R,
+      center.z + Math.sin(el) * R
+    );
     light.target.position.copy(center);
   }
   light.intensity = +$('lightInt').value;
+  light.castShadow = state.shadowOn;
+
+  // 補助光・リム光の同期
+  fillLight.position.set(-light.position.x * 0.7, -light.position.y * 0.7, R * 0.5);
+  fillLight.target.position.copy(center);
+  rimLight.position.set(light.position.y * 0.6, -light.position.x * 0.6, R * 0.7);
+  rimLight.target.position.copy(center);
+
+  // シャドウカメラの範囲をシーンサイズに合わせて更新
+  const maxDim = Math.max(state.widthMm, state.heightMm, 150) * 0.85;
+  light.shadow.camera.left = -maxDim;
+  light.shadow.camera.right = maxDim;
+  light.shadow.camera.top = maxDim;
+  light.shadow.camera.bottom = -maxDim;
+  light.shadow.camera.updateProjectionMatrix();
 }
 
 // ------------------------------------------------------------------ カメラ
@@ -421,6 +577,15 @@ function bindUI() {
     state.mode = b.dataset.mode; applyMode();
   }));
   $('varnishToggle').addEventListener('change', (e) => applyVarnish(e.target.checked));
+  $('shadowToggle')?.addEventListener('change', (e) => {
+    state.shadowOn = e.target.checked;
+    updateLight();
+    requestRender();
+  });
+  $('aoToggle')?.addEventListener('change', (e) => {
+    state.aoOn = e.target.checked;
+    requestRender();
+  });
   $('textureToggle').addEventListener('change', (e) => {
     state.textureOn = e.target.checked;
     composeHeight(); buildNormalMap(state.exag); refreshHeightTex(); updateGeometry(); updateHeightNote();
@@ -480,7 +645,7 @@ function bindUI() {
   $('wheelMode').addEventListener('change', (e) => { controls.wheelMode = e.target.value; });
 
   $('shotBtn').addEventListener('click', () => {
-    renderer.render(scene, controls.camera);
+    renderScene();
     renderer.domElement.toBlob((blob) => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -550,6 +715,51 @@ async function setupModelMode(modelUrl, manifest) {
   state.modelBaseScaleZ = baseScaleZ;
   modelRoot.updateMatrixWorld(true);
 
+  // メッシュの法線再計算、シャドウ、厚盛りPhysicalMaterialへのアップグレード
+  modelRoot.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (child.geometry) {
+        child.geometry.computeVertexNormals();
+      }
+      const orig = child.material;
+      if (orig) {
+        let normalMap = null;
+        if (orig.map && orig.map.image) {
+          if (orig.map.image.complete || orig.map.image.width) {
+            normalMap = createNormalMapFromImage(orig.map.image, 2.5);
+          } else {
+            orig.map.image.addEventListener('load', () => {
+              const nm = createNormalMapFromImage(orig.map.image, 2.5);
+              if (nm) {
+                upgraded.normalMap = nm;
+                upgraded.clearcoatNormalMap = nm;
+                upgraded.needsUpdate = true;
+                requestRender();
+              }
+            });
+          }
+        }
+        const upgraded = new THREE.MeshPhysicalMaterial({
+          map: orig.map || null,
+          color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
+          roughness: 0.28,             // UV印刷インクのしっとりしたツヤ
+          metalness: 0.0,
+          normalMap: normalMap,
+          normalScale: new THREE.Vector2(0.9, 0.9),
+          clearcoat: 1.0,              // 表面のクリアニス層
+          clearcoatRoughness: 0.06,    // ニス層のシャープなツヤ
+          clearcoatNormalMap: normalMap,
+          ior: 1.52,                   // UV印刷インクの屈折率
+          specularIntensity: 1.0,
+        });
+        modelOriginalMaterials.set(child, upgraded);
+        child.material = upgraded;
+      }
+    }
+  });
+
   // 再計算して底面を Z=0、中心(X,Y)を (0,0) に配置
   box = new THREE.Box3().setFromObject(modelRoot);
   const center = box.getCenter(new THREE.Vector3());
@@ -561,19 +771,25 @@ async function setupModelMode(modelUrl, manifest) {
   box = new THREE.Box3().setFromObject(modelRoot);
   state.maxHeight = box.max.z - box.min.z;
 
-  // 基材板の配置
+  // 基材板の配置（影を受け止める）
   const board = state.config.board || {};
   const t = +board.thickness_mm || 3;
   boardMesh = new THREE.Mesh(
     new THREE.BoxGeometry(state.widthMm * 1.02, state.heightMm * 1.02, t),
-    new THREE.MeshStandardMaterial({ color: board.color || '#fafafa', roughness: 0.85, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }),
+    new THREE.MeshStandardMaterial({
+      color: board.color || '#fafafa',
+      roughness: 0.85,
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 2,
+    }),
   );
+  boardMesh.receiveShadow = true;
   boardMesh.position.z = -t / 2 - 0.02;
   group.add(boardMesh);
 
   // UI調整
   $('textureToggle').closest('label').style.display = 'none';
-  $('varnishToggle').closest('label').style.display = 'none';
   document.querySelector('[data-mode="original"]').style.display = 'none';
   document.querySelector('[data-mode="height"]').style.display = 'none';
 
@@ -656,27 +872,33 @@ async function main() {
 
   material = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.62,
+    roughness: 0.30,
     metalness: 0,
     normalMap: normalTex,
     clearcoat: varnishTex ? 1 : 0,
     clearcoatMap: varnishTex || null,
     clearcoatRoughness: 0.06,
     clearcoatNormalMap: normalTex,
-    specularIntensity: 0.6,
+    specularIntensity: 1.0,
+    ior: 1.52,
   });
   heightMaterial = new THREE.MeshBasicMaterial({ map: heightTex, toneMapped: false });
   skirtMaterial = new THREE.MeshStandardMaterial({ color: 0xf3f3f3, roughness: 0.7, side: THREE.DoubleSide });
 
   buildGeometry();
   reliefMesh = new THREE.Mesh(geo, material);
+  reliefMesh.castShadow = true;
+  reliefMesh.receiveShadow = true;
   skirtMesh = new THREE.Mesh(skirtGeo, skirtMaterial);
+  skirtMesh.castShadow = true;
+  skirtMesh.receiveShadow = true;
   const board = state.config.board || {};
   const t = +board.thickness_mm || 3;
   boardMesh = new THREE.Mesh(
     new THREE.BoxGeometry(state.widthMm, state.heightMm, t),
     new THREE.MeshStandardMaterial({ color: board.color || '#fafafa', roughness: 0.85, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }),
   );
+  boardMesh.receiveShadow = true;
   boardMesh.position.z = -t / 2 - 0.02;
   group.add(reliefMesh, skirtMesh, boardMesh);
   updateGeometry();
