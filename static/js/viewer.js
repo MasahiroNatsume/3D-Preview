@@ -363,6 +363,10 @@ function updateGeometry() {
   if (state.isModelMode && modelRoot) {
     modelRoot.scale.z = state.modelBaseScaleZ * Math.max(0.00001, state.exag);
     modelRoot.updateMatrixWorld(true);
+    // スケール変更後も底面が常に Z=0（基材板の上面）にピッタリ密着するように位置を補正
+    const currentBox = new THREE.Box3().setFromObject(modelRoot);
+    modelRoot.position.z -= currentBox.min.z;
+    modelRoot.updateMatrixWorld(true);
     requestRender();
     return;
   }
@@ -713,9 +717,6 @@ async function setupModelMode(modelUrl, manifest) {
   modelRoot.updateMatrixWorld(true);
 
   // メッシュの法線再計算、シャドウ、厚盛りPhysicalMaterialへのアップグレード
-  let normalZSum = 0;
-  let normalCount = 0;
-
   modelRoot.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
@@ -724,9 +725,16 @@ async function setupModelMode(modelUrl, manifest) {
         child.geometry.computeVertexNormals();
         const norm = child.geometry.attributes.normal;
         if (norm) {
+          let normalZSum = 0;
           for (let i = 2; i < norm.count * 3; i += 3) {
             normalZSum += norm.array[i];
-            normalCount++;
+          }
+          // 法線が裏向き（下向き）の場合、法線ベクトルを反転して表面（上向き）にする
+          if (normalZSum < 0) {
+            for (let i = 0; i < norm.count * 3; i++) {
+              norm.array[i] = -norm.array[i];
+            }
+            norm.needsUpdate = true;
           }
         }
       }
@@ -762,19 +770,13 @@ async function setupModelMode(modelUrl, manifest) {
           clearcoatRoughness: 0.20,    // ハイライトの自然な拡散
           ior: 1.48,                   // 印刷インクの屈折率
           specularIntensity: 0.35,     // 正反射の白飛びを抑制
-          side: THREE.DoubleSide,      // 裏面カリングによる白化を防止
+          side: THREE.DoubleSide,      // 両面描画
         });
         modelOriginalMaterials.set(child, upgraded);
         child.material = upgraded;
       }
     }
   });
-
-  // 表面法線が下向き（裏返し）の場合、X軸で180度反転させて表面を上（+Z：カメラ側）に向ける
-  if (normalCount > 0 && (normalZSum / normalCount) < 0) {
-    modelRoot.rotation.x += Math.PI;
-    modelRoot.updateMatrixWorld(true);
-  }
 
   // 再計算して底面を Z=0、中心(X,Y)を (0,0) に配置
   box = new THREE.Box3().setFromObject(modelRoot);
@@ -787,7 +789,7 @@ async function setupModelMode(modelUrl, manifest) {
   box = new THREE.Box3().setFromObject(modelRoot);
   state.maxHeight = box.max.z - box.min.z;
 
-  // 基材板の配置（影を受け止める）
+  // 基材板の配置（上面を Z=0 に配置し、オブジェクト底面と完全に隙間ゼロで密着）
   const board = state.config.board || {};
   const t = +board.thickness_mm || 3;
   boardMesh = new THREE.Mesh(
@@ -801,7 +803,7 @@ async function setupModelMode(modelUrl, manifest) {
     }),
   );
   boardMesh.receiveShadow = true;
-  boardMesh.position.z = -t / 2 - 0.02;
+  boardMesh.position.z = -t / 2;
   group.add(boardMesh);
 
   // UI調整
