@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
@@ -422,13 +423,18 @@ function applyMode() {
           modelOriginalMaterials.set(child, child.material);
         }
         if (m === 'clay' || m === 'height') {
-          const orig = modelOriginalMaterials.get(child);
-          if (orig && orig.normalMap) {
-            clayMaterial.normalMap = orig.normalMap;
-            clayMaterial.clearcoatNormalMap = orig.clearcoatNormalMap;
-            clayMaterial.needsUpdate = true;
+          if (child.userData?.isVarnish) {
+            // ニス層は半透明の光沢層を維持し、下地クレイ形状の上のニス配置を確認できるようにする
+            child.material = modelOriginalMaterials.get(child);
+          } else {
+            const orig = modelOriginalMaterials.get(child);
+            if (orig && orig.normalMap) {
+              clayMaterial.normalMap = orig.normalMap;
+              clayMaterial.clearcoatNormalMap = orig.clearcoatNormalMap;
+              clayMaterial.needsUpdate = true;
+            }
+            child.material = clayMaterial;
           }
-          child.material = clayMaterial;
         } else {
           child.material = modelOriginalMaterials.get(child);
         }
@@ -577,7 +583,7 @@ function bindUI() {
   document.querySelectorAll('#displayMode button').forEach((b) => b.addEventListener('click', () => {
     state.mode = b.dataset.mode; applyMode();
   }));
-  $('varnishToggle').addEventListener('change', (e) => applyVarnish(e.target.checked));
+  $('varnishToggle')?.addEventListener('change', (e) => applyVarnish(e.target.checked));
   $('shadowToggle')?.addEventListener('change', (e) => {
     state.shadowOn = e.target.checked;
     updateLight();
@@ -681,7 +687,25 @@ async function setupModelMode(modelUrl, manifest) {
     const gltf = await new Promise((res, rej) => loader.load(BASE_URL + modelUrl, res, undefined, rej));
     root = gltf.scene || gltf.scenes[0];
   } else if (modelUrl.endsWith('.obj')) {
+    // OBJ + MTL（マテリアル定義）のサポート
+    const mtlUrl = modelUrl.replace(/\.obj$/i, '.mtl');
+    let materials = null;
+    try {
+      const mtlRes = await fetch(BASE_URL + mtlUrl, { method: 'HEAD' });
+      if (mtlRes.ok) {
+        const mtlLoader = new MTLLoader();
+        const basePath = BASE_URL + modelUrl.substring(0, modelUrl.lastIndexOf('/') + 1);
+        mtlLoader.setPath(basePath);
+        materials = await new Promise((res, rej) => mtlLoader.load(mtlUrl.split('/').pop(), res, undefined, rej));
+        materials.preload();
+      }
+    } catch (e) {
+      console.warn('MTLの読み込みをスキップしました:', e);
+    }
     const loader = new OBJLoader();
+    if (materials) {
+      loader.setMaterials(materials);
+    }
     root = await new Promise((res, rej) => loader.load(BASE_URL + modelUrl, res, undefined, rej));
   } else {
     throw new Error('未対応の3Dモデル形式です: ' + modelUrl);
@@ -716,11 +740,22 @@ async function setupModelMode(modelUrl, manifest) {
   state.modelBaseScaleZ = baseScaleZ;
   modelRoot.updateMatrixWorld(true);
 
+  // ニス判定ヘルパー：OBJ/GLTFの名前やマテリアルから「ニス」「varnish」「gloss」などを自動識別
+  const checkIsVarnish = (mesh, mat) => {
+    const meshName = (mesh.name || '').toLowerCase();
+    const matName = (mat?.name || '').toLowerCase();
+    return (
+      meshName.includes('varnish') || meshName.includes('ニス') ||
+      meshName.includes('gloss') || meshName.includes('clear') || meshName.includes('coat') ||
+      matName.includes('varnish') || matName.includes('ニス') ||
+      matName.includes('gloss') || matName.includes('clear') || matName.includes('coat') ||
+      Boolean(mat?.transmission > 0) || Boolean(mat?.transparent && mat?.opacity < 0.95)
+    );
+  };
+
   // メッシュの法線再計算、シャドウ、厚盛りPhysicalMaterialへのアップグレード
   modelRoot.traverse((child) => {
     if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
       if (child.geometry) {
         child.geometry.computeVertexNormals();
         const norm = child.geometry.attributes.normal;
@@ -738,40 +773,76 @@ async function setupModelMode(modelUrl, manifest) {
           }
         }
       }
+
       const orig = child.material;
       if (orig) {
-        let normalMap = null;
-        if (orig.map && orig.map.image) {
-          if (orig.map.image.complete || orig.map.image.width) {
-            normalMap = createNormalMapFromImage(orig.map.image, 2.0);
-          } else {
-            orig.map.image.addEventListener('load', () => {
-              const nm = createNormalMapFromImage(orig.map.image, 2.0);
-              if (nm) {
-                upgraded.normalMap = nm;
-                upgraded.needsUpdate = true;
-                requestRender();
-              }
-            });
+        const isVarnish = checkIsVarnish(child, orig);
+        let upgraded;
+
+        if (isVarnish) {
+          // ── ニス層（3Dモデル/OBJ側で追加されたニスオブジェクト・マテリアル） ──
+          child.userData.isVarnish = true;
+          child.castShadow = false; // 透明ニスが印刷面に濃い黒影を落とさないよう設定
+          child.receiveShadow = true;
+
+          upgraded = new THREE.MeshPhysicalMaterial({
+            color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
+            roughness: 0.08,             // 非常に滑らかな光沢
+            metalness: 0.0,
+            clearcoat: 1.0,              // 艶やかなクリアコート
+            clearcoatRoughness: 0.04,
+            ior: 1.52,                   // UV硬化ニスの屈折率
+            specularIntensity: 0.9,      // ニスのツヤ
+            transmission: 0.88,          // 下地の色が綺麗に透ける透明度
+            transparent: true,
+            opacity: 0.90,
+            polygonOffset: true,         // 下地メッシュとのチラつき（Z-fighting）防止
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+            depthWrite: false,           // 半透明の描画順序を安定化
+            side: THREE.DoubleSide,
+          });
+        } else {
+          // ── 通常の印刷インク層（ニスなしの落ち着いたUVインク質感） ──
+          child.userData.isVarnish = false;
+          child.castShadow = true;
+          child.receiveShadow = true;
+
+          let normalMap = null;
+          if (orig.map && orig.map.image) {
+            if (orig.map.image.complete || orig.map.image.width) {
+              normalMap = createNormalMapFromImage(orig.map.image, 2.0);
+            } else {
+              orig.map.image.addEventListener('load', () => {
+                const nm = createNormalMapFromImage(orig.map.image, 2.0);
+                if (nm) {
+                  upgraded.normalMap = nm;
+                  upgraded.needsUpdate = true;
+                  requestRender();
+                }
+              });
+            }
           }
+          if (orig.map) {
+            orig.map.colorSpace = THREE.SRGBColorSpace;
+            orig.map.needsUpdate = true;
+          }
+
+          upgraded = new THREE.MeshPhysicalMaterial({
+            map: orig.map || null,
+            color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
+            roughness: 0.62,             // 落ち着いたマット〜サテン調のUVインク質感
+            metalness: 0.0,
+            normalMap: normalMap,
+            normalScale: new THREE.Vector2(0.35, 0.35),
+            clearcoat: 0.0,              // ニスは3Dモデル側のバーニッシュ層で表現するため、下地には人工クリアコートなし
+            clearcoatRoughness: 0.35,
+            ior: 1.46,
+            specularIntensity: 0.15,     // 控えめで自然な印刷表面の反射（白飛びなし）
+            side: THREE.DoubleSide,      // 両面描画
+          });
         }
-        if (orig.map) {
-          orig.map.colorSpace = THREE.SRGBColorSpace;
-          orig.map.needsUpdate = true;
-        }
-        const upgraded = new THREE.MeshPhysicalMaterial({
-          map: orig.map || null,
-          color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
-          roughness: 0.58,             // 落ち着いた自然な印刷インク質感
-          metalness: 0.0,
-          normalMap: normalMap,
-          normalScale: new THREE.Vector2(0.35, 0.35),
-          clearcoat: state.varnishOn ? 0.04 : 0.0,    // ニス反射を1/10（0.04）に低減
-          clearcoatRoughness: 0.35,    // ギラつきを抑えた柔らかなハイライト
-          ior: 1.46,
-          specularIntensity: 0.15,     // 控えめな上品な反射
-          side: THREE.DoubleSide,      // 両面描画
-        });
+
         modelOriginalMaterials.set(child, upgraded);
         child.material = upgraded;
       }
@@ -883,7 +954,7 @@ async function main() {
   if (state.imgs.original) textures.original = colorTexture(state.imgs.original, maxTex);
   if (state.fields.varnish) varnishTex = grayTexture(state.fields.varnish, W, H);
   if (!textures.original) document.querySelector('[data-mode="original"]').disabled = true;
-  if (!varnishTex) { $('varnishToggle').disabled = true; $('varnishToggle').closest('label').classList.add('is-disabled'); }
+  if (!varnishTex && $('varnishToggle')) { $('varnishToggle').disabled = true; $('varnishToggle').closest('label').classList.add('is-disabled'); }
 
   setProgress(0.9, 'メッシュを構築しています…');
   await new Promise((r) => setTimeout(r, 20));
