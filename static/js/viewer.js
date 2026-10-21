@@ -406,11 +406,11 @@ function updateGeometry() {
 const modelOriginalMaterials = new Map();
 const clayMaterial = new THREE.MeshPhysicalMaterial({
   color: 0xf5f5f7,
-  roughness: 0.32,
+  roughness: 0.55,
   metalness: 0.0,
-  clearcoat: 0.45,
-  clearcoatRoughness: 0.12,
-  reflectivity: 0.5,
+  clearcoat: 0.05,
+  clearcoatRoughness: 0.35,
+  reflectivity: 0.3,
 });
 
 function applyMode() {
@@ -461,16 +461,16 @@ function applyVarnish(on) {
   if (state.isModelMode && modelRoot) {
     modelRoot.traverse((child) => {
       if (child.isMesh && child.material && child.material.isMeshPhysicalMaterial) {
-        child.material.clearcoat = on ? 0.38 : 0.0;
-        child.material.clearcoatRoughness = 0.20;
-        child.material.roughness = on ? 0.42 : 0.65;
+        child.material.clearcoat = on ? 0.04 : 0.0;
+        child.material.clearcoatRoughness = 0.35;
+        child.material.roughness = on ? 0.58 : 0.72;
         child.material.needsUpdate = true;
       }
     });
   } else if (material) {
-    material.clearcoat = on ? 0.38 : 0.0;
-    material.clearcoatRoughness = 0.20;
-    material.roughness = on ? 0.42 : 0.65;
+    material.clearcoat = on ? 0.04 : 0.0;
+    material.clearcoatRoughness = 0.35;
+    material.roughness = on ? 0.58 : 0.72;
     material.needsUpdate = true;
   }
   requestRender();
@@ -762,14 +762,14 @@ async function setupModelMode(modelUrl, manifest) {
         const upgraded = new THREE.MeshPhysicalMaterial({
           map: orig.map || null,
           color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
-          roughness: 0.45,             // UVインクの自然なマット〜半光沢（白飛び防止）
+          roughness: 0.58,             // 落ち着いた自然な印刷インク質感
           metalness: 0.0,
           normalMap: normalMap,
-          normalScale: new THREE.Vector2(0.35, 0.35), // 適度なエッジ凹凸
-          clearcoat: state.varnishOn ? 0.38 : 0.0,    // 上品なニス層（斜めからの白飛びを防止）
-          clearcoatRoughness: 0.20,    // ハイライトの自然な拡散
-          ior: 1.48,                   // 印刷インクの屈折率
-          specularIntensity: 0.35,     // 正反射の白飛びを抑制
+          normalScale: new THREE.Vector2(0.35, 0.35),
+          clearcoat: state.varnishOn ? 0.04 : 0.0,    // ニス反射を1/10（0.04）に低減
+          clearcoatRoughness: 0.35,    // ギラつきを抑えた柔らかなハイライト
+          ior: 1.46,
+          specularIntensity: 0.15,     // 控えめな上品な反射
           side: THREE.DoubleSide,      // 両面描画
         });
         modelOriginalMaterials.set(child, upgraded);
@@ -890,15 +890,15 @@ async function main() {
 
   material = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.45,
+    roughness: 0.58,
     metalness: 0,
     normalMap: normalTex,
-    normalScale: new THREE.Vector2(0.4, 0.4),
-    clearcoat: varnishTex ? 0.38 : 0,
+    normalScale: new THREE.Vector2(0.35, 0.35),
+    clearcoat: varnishTex ? 0.04 : 0,
     clearcoatMap: varnishTex || null,
-    clearcoatRoughness: 0.20,
-    specularIntensity: 0.35,
-    ior: 1.48,
+    clearcoatRoughness: 0.35,
+    specularIntensity: 0.15,
+    ior: 1.46,
   });
   heightMaterial = new THREE.MeshBasicMaterial({ map: heightTex, toneMapped: false });
   skirtMaterial = new THREE.MeshStandardMaterial({ color: 0xf3f3f3, roughness: 0.7, side: THREE.DoubleSide });
