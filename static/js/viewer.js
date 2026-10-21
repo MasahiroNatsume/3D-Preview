@@ -192,11 +192,11 @@ light.shadow.bias = -0.00015;
 light.shadow.normalBias = 0.04;
 scene.add(light, light.target);
 
-// 補助ライト（暗部のつぶれを防ぐ柔らかな光）
-const fillLight = new THREE.DirectionalLight(0xe8ecf2, 0.18);
+// 補助ライト（暗部のつぶれ・青み転びを防ぐ自然な温かみのある光）
+const fillLight = new THREE.DirectionalLight(0xfff8f0, 0.30);
 scene.add(fillLight);
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0xcfd4dc, 0.25);
+const hemi = new THREE.HemisphereLight(0xffffff, 0xf2ede4, 0.35);
 scene.add(hemi);
 
 const group = new THREE.Group();
