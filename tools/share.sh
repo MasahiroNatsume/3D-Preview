@@ -4,8 +4,10 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$DIR"
 
 # 既存プロセスがあれば停止
-pkill -f "python3 server.py --port 8000" 2>/dev/null
+pkill -f "server.py" 2>/dev/null
 pkill -f "cloudflared tunnel --url http://127.0.0.1:8000" 2>/dev/null
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+sleep 1
 
 echo "Starting local server on port 8000..."
 ADMIN_PASSWORD=yamatesign python3 server.py --port 8000 > /tmp/atsumori-server.log 2>&1 &
