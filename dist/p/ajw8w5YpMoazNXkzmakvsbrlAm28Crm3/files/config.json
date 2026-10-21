@@ -1,0 +1,13 @@
+{
+  "title": "サンプル 01（高さ推定モデル：ファインチューニング後）",
+  "size_mm": {
+    "width": 300,
+    "height": 300.0
+  },
+  "model_file": "model.glb",
+  "board": {
+    "thickness_mm": 3,
+    "color": "#fafafa"
+  },
+  "note": "Blenderオブジェクト 'sample_01_2_after_ft' より自動生成。頂点数: 65,536 / 面数: 65,025"
+}
