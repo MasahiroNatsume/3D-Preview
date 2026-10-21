@@ -1,0 +1,6 @@
+/static/* /static/:splat 200
+/p/:token/manifest.json /data/:token/manifest.json 200
+/p/:token/files/* /data/:token/:splat 200
+/p/* /templates/viewer.html 200
+/admin /templates/admin.html 200
+/ /templates/index.html 200

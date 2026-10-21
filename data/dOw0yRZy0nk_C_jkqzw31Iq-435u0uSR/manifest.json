@@ -1,0 +1,6 @@
+{
+  "title": "サンプル 04（高さ推定モデル：ファインチューニング後）",
+  "files": {},
+  "config": "files/config.json",
+  "model": "files/model.glb"
+}
