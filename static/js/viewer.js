@@ -24,9 +24,9 @@ const QUALITY_LIMITS = {
     colorMax: IS_MOBILE ? 2048 : 4096,
   },
   high: {
-    fieldMax: IS_MOBILE ? 2048 : 4096,
+    fieldMax: IS_MOBILE ? 2048 : 2304,
     gridMax: IS_MOBILE ? 768 : 2304,
-    colorMax: IS_MOBILE ? 2048 : 4096,
+    colorMax: IS_MOBILE ? 2048 : 2304,
   },
 };
 const { fieldMax: FIELD_MAX, gridMax: GRID_MAX, colorMax: COLOR_MAX } = QUALITY_LIMITS[PREVIEW_QUALITY];
