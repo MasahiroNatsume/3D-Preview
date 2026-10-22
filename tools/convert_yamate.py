@@ -255,6 +255,22 @@ def main() -> int:
     ink_max = write_obj(project_dir / "model-ink.obj", raw_heights, mesh_width, mesh_height,
                         args.width_mm, height_mm, "color.png", gamma=gamma)
 
+    layers = {
+        "base": {"ink": "White", "density_percent": args.base_density_percent,
+                 "passes": args.base_passes, "max_height_mm": round(layer_heights["base"], 4)},
+        "color": {"ink": "CMYK", "density_percent": 100, "passes": 1},
+    }
+    if args.texture:
+        layers["texture"] = {
+            "ink": "White", "density_percent": args.texture_density_percent,
+            "passes": args.texture_passes, "max_height_mm": round(layer_heights["texture"], 4),
+        }
+    if args.varnish:
+        layers["varnish"] = {
+            "ink": "Gloss", "density_percent": args.varnish_density_percent,
+            "passes": args.varnish_passes, "max_height_mm": round(layer_heights["varnish"], 4),
+        }
+
     config = {
         "title": args.title,
         "size_mm": {"width": round(args.width_mm, 3), "height": round(height_mm, 3)},
@@ -266,17 +282,7 @@ def main() -> int:
             "gamma": round(gamma, 6),
             "source": "Yamate meeting notes: 50% input density measured at about 30% height; approximate until printer calibration",
         },
-        "layers": {
-            "base": {"ink": "White", "density_percent": args.base_density_percent,
-                     "passes": args.base_passes, "max_height_mm": round(layer_heights["base"], 4)},
-            "texture": {"ink": "White", "density_percent": args.texture_density_percent,
-                        "passes": args.texture_passes if args.texture else 0,
-                        "max_height_mm": round(layer_heights["texture"], 4)},
-            "varnish": {"ink": "Gloss", "density_percent": args.varnish_density_percent,
-                        "passes": args.varnish_passes if args.varnish else 0,
-                        "max_height_mm": round(layer_heights["varnish"], 4)},
-            "color": {"ink": "CMYK", "density_percent": 100, "passes": 1},
-        },
+        "layers": layers,
         "note": "Height curve is an estimate from one measured point, not a printer-specific calibration. Verify against a physical test print.",
     }
     (project_dir / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
