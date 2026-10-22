@@ -1,11 +1,45 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "3d-preview",
-  "compatibility_date": "2026-10-19",
-  "observability": {
-    "enabled": true
-  },
-  "assets": {
-    "directory": "dist"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "3d-preview",
+	"main": "src/index.js",
+	"build": {
+		"command": "npm run build"
+	},
+	"compatibility_date": "2026-10-19",
+	"observability": {
+		"enabled": true
+	},
+	"assets": {
+		"directory": "dist",
+		"binding": "ASSETS",
+		"run_worker_first": [
+			"/",
+			"/index.html",
+			"/admin*",
+			"/api/*",
+			"/p/*"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "3d-preview",
+			"database_id": "3d96b658-6a52-42ce-8435-bb8f0b05a854",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "PROJECT_FILES",
+			"bucket_name": "3d-preview-project-files"
+		}
+	],
+	"vars": {
+		"ADMIN_USER": "admin"
+	},
+	"secrets": {
+		"required": [
+			"ADMIN_PASSWORD"
+		]
+	}
 }

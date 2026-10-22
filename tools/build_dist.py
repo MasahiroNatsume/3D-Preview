@@ -24,12 +24,16 @@ def build():
         if src.exists():
             shutil.copy(src, DIST / name)
 
+    shutil.copy(TEMPLATES_DIR / "admin.html", DIST / "index.html")
+
     # 静的アセット (static)
     if STATIC_DIR.exists():
         shutil.copytree(STATIC_DIR, DIST / "static")
 
     # 閲覧用ビューアー HTML
     viewer_html = (TEMPLATES_DIR / "viewer.html").read_text("utf-8")
+    (DIST / "viewer").mkdir(parents=True, exist_ok=True)
+    (DIST / "viewer" / "index.html").write_text(viewer_html, "utf-8")
 
     # 各サンプルトークンのページ・モデルデータを配置
     if DATA_DIR.exists():
@@ -51,7 +55,7 @@ def build():
             files_dir = p_dir / "files"
             files_dir.mkdir(parents=True, exist_ok=True)
             for item in token_dir.iterdir():
-                if item.name != "manifest.json":
+                if item.is_file() and item.name not in {"manifest.json", "meta.json"}:
                     shutil.copy(item, files_dir / item.name)
 
     print("dist build completed successfully.")

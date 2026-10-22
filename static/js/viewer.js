@@ -286,6 +286,12 @@ function layerCfg(name) {
   return merged;
 }
 
+function inkHeightGamma() {
+  const curve = state.config.ink_height_curve || {};
+  const gamma = Number(curve.gamma);
+  return Number.isFinite(gamma) && gamma > 0 ? gamma : 1.737;
+}
+
 /**
  * UV厚盛り印刷の実機物理挙動シミュレーション（ヤマテ技術仕様書準拠）
  * 1. 非線形な沈降・盛り下がり（濃度50%→実測30%高さ、γ ≈ 1.737）
@@ -298,11 +304,11 @@ function simulateRealPrintHeight(rawField, W, H, maxMm) {
   if (maxMm <= 0.0001) return sim;
 
   // 1. ヤマテ実測非線形カーブ（50%濃度で実測30%高さに沈降する盛り下がり特性）
-  const GAMMA = 1.737;
+  const gamma = inkHeightGamma();
   for (let i = 0; i < n; i++) {
     const v = rawField[i] / maxMm;
     if (v > 0) {
-      sim[i] = Math.pow(Math.min(1, Math.max(0, v)), GAMMA) * maxMm;
+      sim[i] = Math.pow(Math.min(1, Math.max(0, v)), gamma) * maxMm;
     }
   }
 
@@ -633,7 +639,7 @@ function setProgress(p, text) {
 function fmt(n, d = 2) { return (Math.round(n * 10 ** d) / 10 ** d).toFixed(d); }
 
 function updateHeightNote() {
-  const simTag = state.realPrintSim ? '【実機盛り下がり反映中】' : '【理想形状】';
+  const simTag = state.realPrintSim ? '【実機補正後】' : '【入力ハイトマップ値】';
   if (state.isModelMode) {
     $('heightNote').textContent = `厚み 約 ${fmt(state.maxHeight)} mm ${simTag}`;
     return;
@@ -1025,7 +1031,7 @@ function applyModelPrintSim(simOn) {
         if (simOn) {
           const norm = Math.max(0, Math.min(1, (oz - minZ) / rangeZ));
           // ヤマテ実測非線形盛り下がり特性（50%濃度→30%高さ）
-          const sagged = Math.pow(norm, GAMMA);
+          const sagged = Math.pow(norm, inkHeightGamma());
           pos.setZ(i, minZ + sagged * rangeZ * 0.985);
         } else {
           pos.setZ(i, oz);

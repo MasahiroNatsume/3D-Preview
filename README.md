@@ -101,3 +101,74 @@ python3 tools/make_sample.py --install
 ```
 
 ※ `config.json` を用意しなくても、管理画面のフォームから寸法や各レイヤーの高さを直接入力して発行することも可能です。
+
+---
+
+## Cloudflare Workersで管理APIを使う
+
+管理APIはD1（案件情報）とR2（画像・モデルファイル）を使用します。ローカル開発ではCloudflareのローカルエミュレーターがストレージを用意します。
+
+### ローカル開発
+
+```powershell
+Copy-Item .dev.vars.example .dev.vars
+npx wrangler d1 migrations apply DB --local
+npx wrangler dev
+```
+
+`.dev.vars` の `ADMIN_PASSWORD` はローカル用に変更してください。
+
+### 本番デプロイ
+
+1. CloudflareにD1データベースとR2バケットを作成します。
+
+```powershell
+npx wrangler d1 create 3d-preview
+npx wrangler r2 bucket create 3d-preview-project-files
+```
+
+2. D1作成時に表示されたIDを `wrangler.jsonc` の `database_id` に設定します。
+3. 管理画面のパスワードをCloudflare Secretとして登録し、マイグレーションを適用します。
+
+```powershell
+npx wrangler secret put ADMIN_PASSWORD
+npx wrangler d1 migrations apply DB --remote
+```
+
+4. Workerをデプロイします。Wranglerがデプロイ前に `npm run build` を実行します。
+
+```powershell
+npx wrangler deploy
+```
+
+Workerが `/api/admin/*` と共有リンクを処理し、既存の静的サンプルは `dist/` から配信します。`meta.json` は公開ファイルとして配布されません。
+
+---
+
+## PSDからプレビュー用データを作る
+
+変換用ライブラリをインストールします。
+
+```powershell
+python -m pip install -r tools/requirements-convert.txt
+```
+
+鷲サンプルのWB/WT/C版を処理する例です。WBをベース、WTをテクスチャとして分け、カラーデータと共有ビューアー用のトークン付きプロジェクト、OBJを `data/` に出力します。`--varnish` は実際のV版マップを確認できた場合だけ指定してください。
+
+```powershell
+python tools/convert_yamate.py `
+   --base "C:\Users\happy\Downloads\送付用\送付用\鷲\ワシ-WB.psd" `
+   --texture "C:\Users\happy\Downloads\送付用\送付用\鷲\ワシ-WT.psd" `
+   --color "C:\Users\happy\Downloads\送付用\送付用\鷲\ワシ-C.psd" `
+   --output data `
+   --title "鷲サンプル" `
+   --width-mm 300 `
+   --base-density-percent 800 --base-passes 4 `
+   --texture-density-percent 800 --texture-passes 4 `
+```
+
+実機高さは、議事録にある「白インク900%で約0.2mm/パス」と、実測1点「濃度50%で約30%の高さ」から近似します。後者から $h = x^{1.737}$ としており、機械固有の校正曲線ではありません。生成された `config.json` に校正値を保存し、ビューアーの「実高さ補正」をONにすると適用されます。OFFでは入力マップ値を表示します。
+
+OBJは入力どおりの `model.obj` と、補正済みの `model-ink.obj` を両方出力します。ビューアーは同一ページでOBJモードに切り替わるため、共有プレビューではWB/WT/Color/Varnishのレイヤー表示を使い、OBJは外部ソフトでの確認用です。
+
+Varnishとして使うPDFは、出力前に内容を確認してください。今回の鷲のV PDFは緑の小さな点のみを含み、見本PDFでは `V500% x 2` と記載されています。これが本当に艶版の全データか、版担当者へ確認する必要があります。
