@@ -12,9 +12,24 @@ import { BlenderControls } from './controls.js';
 // ------------------------------------------------------------------ 定数
 const BASE_URL = location.pathname.replace(/\/?$/, '/');
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
-const FIELD_MAX = IS_MOBILE ? 1024 : 2048;  // 高さ・法線マップの解像度（長辺）
-const GRID_MAX = IS_MOBILE ? 256 : 512;     // メッシュ分割数（長辺）
-const COLOR_MAX = IS_MOBILE ? 2048 : 4096;  // カラーテクスチャ（長辺）
+const QUALITY_KEY = 'yamate-preview-quality';
+const PREVIEW_QUALITY = (() => {
+  try { return localStorage.getItem(QUALITY_KEY) === 'high' ? 'high' : 'low'; }
+  catch { return 'low'; }
+})();
+const QUALITY_LIMITS = {
+  low: {
+    fieldMax: IS_MOBILE ? 1024 : 2048,
+    gridMax: IS_MOBILE ? 256 : 512,
+    colorMax: IS_MOBILE ? 2048 : 4096,
+  },
+  high: {
+    fieldMax: IS_MOBILE ? 2048 : 4096,
+    gridMax: IS_MOBILE ? 768 : 2304,
+    colorMax: IS_MOBILE ? 2048 : 4096,
+  },
+};
+const { fieldMax: FIELD_MAX, gridMax: GRID_MAX, colorMax: COLOR_MAX } = QUALITY_LIMITS[PREVIEW_QUALITY];
 
 const DEFAULT_LAYER = {
   heightmap: { max_height_mm: 1.2 },
@@ -31,6 +46,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   config: {},
   title: '',
+  previewQuality: PREVIEW_QUALITY,
   imgs: {},
   isModelMode: false,
   modelBaseScaleZ: 1,
@@ -673,6 +689,25 @@ function buildSpec() {
 }
 
 function bindUI() {
+  const qualitySection = $('previewQualitySec');
+  if (state.isModelMode) {
+    qualitySection.hidden = true;
+  } else {
+    const { sx, sy } = geo.userData;
+    const gridStep = Math.max(state.widthMm / sx, state.heightMm / sy);
+    $('qualityNote').textContent = `${state.W} × ${state.H} px / メッシュ間隔 約${fmt(gridStep, 2)}mm`;
+    document.querySelectorAll('#previewQuality button').forEach((button) => {
+      const active = button.dataset.quality === state.previewQuality;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+      button.addEventListener('click', () => {
+        if (button.dataset.quality === state.previewQuality) return;
+        try { localStorage.setItem(QUALITY_KEY, button.dataset.quality); } catch {}
+        location.reload();
+      });
+    });
+  }
+
   document.querySelectorAll('.view-bar button').forEach((b) => b.addEventListener('click', () => handleView(b.dataset.view)));
   document.querySelectorAll('#displayMode button').forEach((b) => b.addEventListener('click', () => {
     state.mode = b.dataset.mode; applyMode();

@@ -194,7 +194,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pass-height-mm", type=float, default=REFERENCE_PASS_HEIGHT_MM)
     parser.add_argument("--calibration-input", type=float, default=DEFAULT_CALIBRATION_INPUT)
     parser.add_argument("--calibration-output", type=float, default=DEFAULT_CALIBRATION_OUTPUT)
-    parser.add_argument("--max-edge", type=int, default=2048)
+    parser.add_argument("--max-edge", type=int, default=4096)
     parser.add_argument("--mesh-long-edge", type=int, default=384)
     parser.add_argument("--white-high", action="store_true", help="Treat white as high instead of the Yamate default black-high")
     return parser.parse_args()
