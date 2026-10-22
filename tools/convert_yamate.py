@@ -184,6 +184,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--varnish", type=Path, help="Optional varnish PSD/image/vector PDF")
     parser.add_argument("--output", type=Path, default=Path("data"), help="Output data root")
     parser.add_argument("--title", default="Yamate UV preview")
+    parser.add_argument("--note", default="", help="Extra source/assumption note stored in config.json")
     parser.add_argument("--width-mm", type=float, default=300)
     parser.add_argument("--base-density-percent", type=float, default=800)
     parser.add_argument("--base-passes", type=int, default=4)
@@ -283,7 +284,8 @@ def main() -> int:
             "source": "Yamate meeting notes: 50% input density measured at about 30% height; approximate until printer calibration",
         },
         "layers": layers,
-        "note": "Height curve is an estimate from one measured point, not a printer-specific calibration. Verify against a physical test print.",
+        "note": "Height curve is an estimate from one measured point, not a printer-specific calibration. Verify against a physical test print."
+            + (f" {args.note}" if args.note else ""),
     }
     (project_dir / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
