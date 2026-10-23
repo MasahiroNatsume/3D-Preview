@@ -28,6 +28,8 @@ async function build() {
     if (error.code !== "ENOENT") throw error;
   }
 
+  const staticProjects = [];
+
   for (const token of tokens.filter((entry) => entry.isDirectory())) {
     const sourceDir = path.join(dataDir, token.name);
     const projectDir = path.join(dist, "p", token.name);
@@ -35,12 +37,45 @@ async function build() {
     await fs.mkdir(filesDir, { recursive: true });
     await fs.writeFile(path.join(projectDir, "index.html"), viewerHtml, "utf8");
 
+    let meta = {
+      title: token.name,
+      created_at: null,
+      expires_at: null,
+    };
+    try {
+      const metaContent = await fs.readFile(path.join(sourceDir, "meta.json"), "utf8");
+      meta = { ...meta, ...JSON.parse(metaContent) };
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+
+    const copiedFiles = [];
     for (const entry of await fs.readdir(sourceDir, { withFileTypes: true })) {
       if (!entry.isFile() || entry.name === "meta.json") continue;
       const targetDir = entry.name === "manifest.json" ? projectDir : filesDir;
       await fs.copyFile(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
+      if (entry.name !== "manifest.json") {
+        copiedFiles.push(entry.name);
+      }
     }
+    copiedFiles.sort();
+
+    staticProjects.push({
+      token: token.name,
+      title: meta.title || token.name,
+      created_at: meta.created_at ?? null,
+      expires_at: meta.expires_at ?? null,
+      files: copiedFiles,
+      is_static: true,
+    });
   }
+
+  staticProjects.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
+  await fs.writeFile(
+    path.join(dist, "static-projects.json"),
+    JSON.stringify(staticProjects, null, 2),
+    "utf8"
+  );
 
   console.log("dist build completed successfully.");
 }

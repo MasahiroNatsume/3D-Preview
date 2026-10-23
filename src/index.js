@@ -133,8 +133,10 @@ async function handleAdminPage(request, env, path) {
   return withPrivateHeaders(await fetchAsset(env, request, "/"));
 }
 
-async function handleProjectList(env) {
-  const result = await env.DB.prepare(`
+async function handleProjectList(env, request) {
+  let dbProjects = [];
+  try {
+    const result = await env.DB.prepare(`
     SELECT p.token, p.title, p.created_at, p.expires_at,
            GROUP_CONCAT(f.filename, ',') AS files
     FROM projects p
@@ -143,13 +145,56 @@ async function handleProjectList(env) {
     ORDER BY p.created_at DESC
   `).all();
 
-  const projects = result.results.map((project) => ({
-    token: project.token,
-    title: project.title,
-    created_at: project.created_at,
-    expires_at: project.expires_at,
-    files: project.files ? project.files.split(",").sort() : [],
-  }));
+    dbProjects = (result.results || []).map((project) => ({
+      token: project.token,
+      title: project.title,
+      created_at: project.created_at,
+      expires_at: project.expires_at,
+      files: project.files ? project.files.split(",").sort() : [],
+      is_static: false,
+    }));
+  } catch (error) {
+    console.error("Failed to query projects from DB", error);
+  }
+
+  let staticProjects = [];
+  if (env.ASSETS) {
+    try {
+      const url = request ? new URL("/static-projects.json", request.url) : new URL("http://localhost/static-projects.json");
+      const res = await env.ASSETS.fetch(url);
+      if (res.ok) {
+        staticProjects = await res.json();
+      }
+    } catch (error) {
+      console.error("Failed to fetch static projects", error);
+    }
+  }
+
+  const seenTokens = new Set();
+  const projects = [];
+
+  for (const project of dbProjects) {
+    if (!seenTokens.has(project.token)) {
+      seenTokens.add(project.token);
+      projects.push(project);
+    }
+  }
+
+  for (const project of staticProjects) {
+    if (!seenTokens.has(project.token)) {
+      seenTokens.add(project.token);
+      projects.push({
+        token: project.token,
+        title: project.title,
+        created_at: project.created_at,
+        expires_at: project.expires_at ?? null,
+        files: Array.isArray(project.files) ? project.files : [],
+        is_static: true,
+      });
+    }
+  }
+
+  projects.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
   return jsonResponse({ projects });
 }
 
@@ -343,7 +388,23 @@ async function uploadProjectFile(request, env, token, encodedName) {
   return jsonResponse({ ok: true, name, bytes });
 }
 
-async function deleteProject(env, token) {
+async function deleteProject(env, token, request) {
+  if (env.ASSETS) {
+    try {
+      const url = request ? new URL("/static-projects.json", request.url) : new URL("http://localhost/static-projects.json");
+      const res = await env.ASSETS.fetch(url);
+      if (res.ok) {
+        const staticProjects = await res.json();
+        if (Array.isArray(staticProjects) && staticProjects.some((p) => p.token === token)) {
+          throw new HttpError(403, "静的プロジェクトは削除できません");
+        }
+      }
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      console.error("Failed to verify static project status", error);
+    }
+  }
+
   if (!TOKEN_PATTERN.test(token)) throw new HttpError(404, "not found");
   const project = await getProject(env, token);
   if (!project) throw new HttpError(404, "not found");
@@ -357,12 +418,14 @@ async function deleteProject(env, token) {
   return jsonResponse({ ok: true });
 }
 
+const handleProjectDelete = deleteProject;
+
 async function handleAdminApi(request, env, path) {
   const authError = authenticate(request, env);
   if (authError) return authError;
 
   if (path === "/api/admin/projects" && request.method === "GET") {
-    return handleProjectList(env);
+    return handleProjectList(env, request);
   }
   if (path === "/api/admin/projects" && request.method === "POST") {
     return createProject(request, env);
@@ -375,7 +438,7 @@ async function handleAdminApi(request, env, path) {
 
   const deleteMatch = path.match(/^\/api\/admin\/projects\/([^/]+)$/);
   if (deleteMatch && request.method === "DELETE") {
-    return deleteProject(env, deleteMatch[1]);
+    return deleteProject(env, deleteMatch[1], request);
   }
 
   return errorResponse("not found", 404);

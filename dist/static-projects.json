@@ -1,0 +1,330 @@
+[
+  {
+    "token": "yamate-bamboo-arm-c",
+    "title": "竹籠 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-bamboo-gt",
+    "title": "竹籠 - Craftsman GT (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-bamboo-hybrid-e",
+    "title": "竹籠 - Hybrid Arm E (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-bamboo-neural-h2",
+    "title": "竹籠 - Neural H2 (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-cat-arm-c",
+    "title": "猫 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-cat-gt",
+    "title": "猫 - Craftsman GT (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-cat-hybrid-e",
+    "title": "猫 - Hybrid Arm E (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-cat-neural-h2",
+    "title": "猫 - Neural H2 (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-eagle-arm-c",
+    "title": "鷲 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-eagle-gt",
+    "title": "鷲 - Craftsman GT (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-eagle-hybrid-e",
+    "title": "鷲 - Hybrid Arm E (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-eagle-neural-h2",
+    "title": "鷲 - Neural H2 (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-gogh-arm-c",
+    "title": "星月夜 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-gogh-gt",
+    "title": "星月夜 - Craftsman GT (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-gogh-hybrid-e",
+    "title": "星月夜 - Hybrid Arm E (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "yamate-gogh-neural-h2",
+    "title": "星月夜 - Neural H2 (ヤマテUV厚盛り3Dプレビュー)",
+    "created_at": 1792748965.894828,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "xSmWVlH8zARnm8XsDsaeUXebAzRX7WTw",
+    "title": "ハイトマップ実機シミュレーション検証サンプル",
+    "created_at": 1792555646.8566048,
+    "expires_at": 1795147646.8566048,
+    "files": [
+      "color.png",
+      "heightmap.png"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "dOw0yRZy0nk_C_jkqzw31Iq-435u0uSR",
+    "title": "サンプル 04（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421648.519509,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "gm2lX8IUDWfiU9l5WQQk6RiK3wi0vWVW",
+    "title": "サンプル 03（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421647.5324311,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "rBsNDFJyat_avdaeomDdQ01ajvQ4ZNnU",
+    "title": "サンプル 02（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421646.544951,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "ajw8w5YpMoazNXkzmakvsbrlAm28Crm3",
+    "title": "サンプル 01（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421645.549522,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "kwkGw3IvwxWs3EgcBdQRBA1W_XXVhZux",
+    "title": "サンプル 00（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421644.5638652,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "F20TFh44w9QtMJJZ2rC9gIZztLIX0NSW",
+    "title": "サンプル 00（高さ推定モデル：ファインチューニング後）",
+    "created_at": 1792421069.1525881,
+    "expires_at": null,
+    "files": [
+      "config.json",
+      "model.glb",
+      "model.mtl",
+      "model.obj"
+    ],
+    "is_static": true
+  },
+  {
+    "token": "EeZYAJElyXcmvciJC2QV5myye2CWVXJm",
+    "title": "サンプル：花の厚盛りサイン",
+    "created_at": 1792416034.4823549,
+    "expires_at": null,
+    "files": [
+      "base.png",
+      "color.png",
+      "config.json",
+      "original.png",
+      "texture.png",
+      "varnish.png"
+    ],
+    "is_static": true
+  }
+]

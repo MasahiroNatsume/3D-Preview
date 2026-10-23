@@ -136,18 +136,24 @@
     const { projects } = await api('GET', '/api/admin/projects');
     $('empty').hidden = projects.length > 0;
     $('list').innerHTML = projects.map((p) => {
-      const d = new Date(p.created_at * 1000);
-      const date = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+      const d = p.created_at ? new Date(p.created_at * 1000) : null;
+      const date = d && !isNaN(d.getTime())
+        ? `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+        : '—';
       const exp = p.expires_at ? `<br><small>〜${new Date(p.expires_at * 1000).toLocaleDateString('ja-JP')}</small>` : '';
       const url = new URL(`/p/${p.token}`, location.origin).href;
+      const filesList = Array.isArray(p.files) ? p.files.map(esc).join(' / ') : '';
+      const action = p.is_static
+        ? '<span class="badge-preset" style="display:inline-block;margin-left:6px;padding:4px 8px;font-size:11px;font-weight:600;color:#666;background:#f0f0f0;border:1px solid #ddd;border-radius:2px;letter-spacing:0.04em;vertical-align:middle;">プリセット</span>'
+        : `<button class="danger" data-del="${esc(p.token)}">Delete</button>`;
       return `<tr>
         <td class="date">${date}${exp}</td>
         <td>${esc(p.title) || '<span style="color:#aaa">（無題）</span>'}</td>
-        <td class="files">${p.files.map(esc).join(' / ')}</td>
+        <td class="files">${filesList}</td>
         <td class="ops">
           <button data-copy="${esc(url)}">Copy</button>
           <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
-          <button class="danger" data-del="${esc(p.token)}">Delete</button>
+          ${action}
         </td></tr>`;
     }).join('');
   }
