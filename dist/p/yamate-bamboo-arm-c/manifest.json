@@ -1,0 +1,10 @@
+{
+  "title": "竹籠 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+  "files": {
+    "original": "files/original.png",
+    "base": "files/base.png",
+    "texture": "files/texture.png",
+    "color": "files/color.png"
+  },
+  "config": "files/config.json"
+}

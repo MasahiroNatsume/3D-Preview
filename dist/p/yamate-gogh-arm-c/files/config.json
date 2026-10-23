@@ -1,0 +1,32 @@
+{
+  "title": "星月夜 - Arm C (ヤマテUV厚盛り3Dプレビュー)",
+  "size_mm": {
+    "width": 300,
+    "height": 238
+  },
+  "white_is_high": true,
+  "board": {
+    "thickness_mm": 3.0,
+    "color": "#fafafa"
+  },
+  "layers": {
+    "base": {
+      "ink": "White",
+      "density_percent": 800,
+      "passes": 4,
+      "max_height_mm": 1.5
+    },
+    "texture": {
+      "ink": "White",
+      "density_percent": 800,
+      "passes": 4,
+      "max_height_mm": 1.0
+    },
+    "color": {
+      "ink": "CMYK",
+      "density_percent": 100,
+      "passes": 1
+    }
+  },
+  "note": "ヤマテUV厚盛り印刷: ゴッホ『星月夜』 / Arm C (カテゴリ適応DoG + スペクトル整合)"
+}
