@@ -86,11 +86,20 @@
         <button data-mode="clay" title="テクスチャを非表示にして物理的な凹凸形状を確認">立体形状</button>
         <button data-mode="height">高さ</button>
       </div>
-      <label class="check is-sim" id="realPrintLabel"><input type="checkbox" id="realPrintToggle" checked><span>実機シミュレーション（盛り下がり再現）</span></label>
+      <label class="check is-sim" id="realPrintLabel"><input type="checkbox" id="realPrintToggle" checked><span>実高さ補正（ON：インクの沈み込み／OFF：入力値）</span></label>
       <label class="check"><input type="checkbox" id="shadowToggle" checked><span>リアルな影（シャドウ）</span></label>
       <label class="check"><input type="checkbox" id="aoToggle" checked><span>溝の陰影（AO）</span></label>
       <label class="check"><input type="checkbox" id="textureToggle" checked><span>テクスチャ（細かな凹凸）</span></label>
       <label class="check"><input type="checkbox" id="boardToggle" checked><span>基材を表示</span></label>
+    </section>
+
+    <section class="panel-sec" id="previewQualitySec">
+      <h2 class="sec-title"><span class="en">Preview Detail</span><span class="ja">表示解像度</span></h2>
+      <div class="seg" id="previewQuality" role="group" aria-label="プレビュー解像度">
+        <button type="button" data-quality="low" class="is-active" aria-pressed="true">低</button>
+        <button type="button" data-quality="high" aria-pressed="false">高</button>
+      </div>
+      <p class="note" id="qualityNote"></p>
     </section>
 
     <section class="panel-sec">

@@ -12,9 +12,24 @@ import { BlenderControls } from './controls.js';
 // ------------------------------------------------------------------ 定数
 const BASE_URL = location.pathname.replace(/\/?$/, '/');
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
-const FIELD_MAX = IS_MOBILE ? 1024 : 2048;  // 高さ・法線マップの解像度（長辺）
-const GRID_MAX = IS_MOBILE ? 256 : 512;     // メッシュ分割数（長辺）
-const COLOR_MAX = IS_MOBILE ? 2048 : 4096;  // カラーテクスチャ（長辺）
+const QUALITY_KEY = 'yamate-preview-quality';
+const PREVIEW_QUALITY = (() => {
+  try { return localStorage.getItem(QUALITY_KEY) === 'high' ? 'high' : 'low'; }
+  catch { return 'low'; }
+})();
+const QUALITY_LIMITS = {
+  low: {
+    fieldMax: IS_MOBILE ? 1024 : 2048,
+    gridMax: IS_MOBILE ? 256 : 512,
+    colorMax: IS_MOBILE ? 2048 : 4096,
+  },
+  high: {
+    fieldMax: IS_MOBILE ? 2048 : 2304,
+    gridMax: IS_MOBILE ? 768 : 2304,
+    colorMax: IS_MOBILE ? 2048 : 2304,
+  },
+};
+const { fieldMax: FIELD_MAX, gridMax: GRID_MAX, colorMax: COLOR_MAX } = QUALITY_LIMITS[PREVIEW_QUALITY];
 
 const DEFAULT_LAYER = {
   heightmap: { max_height_mm: 1.2 },
@@ -31,6 +46,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   config: {},
   title: '',
+  previewQuality: PREVIEW_QUALITY,
   imgs: {},
   isModelMode: false,
   modelBaseScaleZ: 1,
@@ -286,6 +302,12 @@ function layerCfg(name) {
   return merged;
 }
 
+function inkHeightGamma() {
+  const curve = state.config.ink_height_curve || {};
+  const gamma = Number(curve.gamma);
+  return Number.isFinite(gamma) && gamma > 0 ? gamma : 1.737;
+}
+
 /**
  * UV厚盛り印刷の実機物理挙動シミュレーション（ヤマテ技術仕様書準拠）
  * 1. 非線形な沈降・盛り下がり（濃度50%→実測30%高さ、γ ≈ 1.737）
@@ -298,11 +320,11 @@ function simulateRealPrintHeight(rawField, W, H, maxMm) {
   if (maxMm <= 0.0001) return sim;
 
   // 1. ヤマテ実測非線形カーブ（50%濃度で実測30%高さに沈降する盛り下がり特性）
-  const GAMMA = 1.737;
+  const gamma = inkHeightGamma();
   for (let i = 0; i < n; i++) {
     const v = rawField[i] / maxMm;
     if (v > 0) {
-      sim[i] = Math.pow(Math.min(1, Math.max(0, v)), GAMMA) * maxMm;
+      sim[i] = Math.pow(Math.min(1, Math.max(0, v)), gamma) * maxMm;
     }
   }
 
@@ -633,7 +655,7 @@ function setProgress(p, text) {
 function fmt(n, d = 2) { return (Math.round(n * 10 ** d) / 10 ** d).toFixed(d); }
 
 function updateHeightNote() {
-  const simTag = state.realPrintSim ? '【実機盛り下がり反映中】' : '【理想形状】';
+  const simTag = state.realPrintSim ? '【実機補正後】' : '【入力ハイトマップ値】';
   if (state.isModelMode) {
     $('heightNote').textContent = `厚み 約 ${fmt(state.maxHeight)} mm ${simTag}`;
     return;
@@ -667,6 +689,25 @@ function buildSpec() {
 }
 
 function bindUI() {
+  const qualitySection = $('previewQualitySec');
+  if (state.isModelMode) {
+    qualitySection.hidden = true;
+  } else {
+    const { sx, sy } = geo.userData;
+    const gridStep = Math.max(state.widthMm / sx, state.heightMm / sy);
+    $('qualityNote').textContent = `${state.W} × ${state.H} px / メッシュ間隔 約${fmt(gridStep, 2)}mm`;
+    document.querySelectorAll('#previewQuality button').forEach((button) => {
+      const active = button.dataset.quality === state.previewQuality;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+      button.addEventListener('click', () => {
+        if (button.dataset.quality === state.previewQuality) return;
+        try { localStorage.setItem(QUALITY_KEY, button.dataset.quality); } catch {}
+        location.reload();
+      });
+    });
+  }
+
   document.querySelectorAll('.view-bar button').forEach((b) => b.addEventListener('click', () => handleView(b.dataset.view)));
   document.querySelectorAll('#displayMode button').forEach((b) => b.addEventListener('click', () => {
     state.mode = b.dataset.mode; applyMode();
@@ -1025,7 +1066,7 @@ function applyModelPrintSim(simOn) {
         if (simOn) {
           const norm = Math.max(0, Math.min(1, (oz - minZ) / rangeZ));
           // ヤマテ実測非線形盛り下がり特性（50%濃度→30%高さ）
-          const sagged = Math.pow(norm, GAMMA);
+          const sagged = Math.pow(norm, inkHeightGamma());
           pos.setZ(i, minZ + sagged * rangeZ * 0.985);
         } else {
           pos.setZ(i, oz);

@@ -4,22 +4,79 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>厚盛り印刷 3Dプレビュー</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
+<title>Admin | 厚盛り印刷 3Dプレビュー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 <header class="site-header">
-  <span class="brand"><span class="brand-en">YAMATE-SIGN</span><span class="brand-ja">厚盛り印刷 3Dプレビュー</span></span>
+  <a class="brand" href="/admin">
+    <span class="brand-en">YAMATE-SIGN</span>
+    <span class="brand-ja">厚盛り印刷 3Dプレビュー</span>
+  </a>
+  <div class="header-title"><span class="label-en">Admin</span><span class="header-project">管理画面</span></div>
 </header>
 <div class="grad-line"></div>
+
 <div class="page">
-  <div class="center-msg">
-    <div>
-      <div class="en">3D Preview</div>
-      <p class="ja">このページは共有されたリンクからのみご覧いただけます。<br>担当者からお送りしたURLをご確認ください。</p>
-    </div>
+  <section class="page-hero">
+    <h1><span class="en">Share Preview</span><span class="ja">プレビューリンクの発行</span></h1>
+    <p>レイヤーデータ（original / base / texture / color / varnish / config.json）をアップロードすると、<br>推測不可能な共有URLが発行されます。リンクを知っている人だけが閲覧できます。</p>
+  </section>
+
+  <div class="container">
+    <section class="card" id="dropArea">
+      <h2><span class="en">Upload</span><span class="ja">データのアップロード</span></h2>
+
+      <div class="form-grid">
+        <div class="form-row"><label for="title"><span class="en">Title</span>案件名</label><input type="text" id="title" placeholder="例）〇〇様 店頭サイン"></div>
+        <div class="form-row"><label for="width"><span class="en">Width</span>幅 (mm)</label><input type="number" id="width" min="1" step="0.1" placeholder="300"></div>
+        <div class="form-row"><label for="height"><span class="en">Height</span>高さ (mm)</label><input type="number" id="height" min="1" step="0.1" placeholder="画像比率から自動"></div>
+        <div class="form-row"><label for="heightmapH"><span class="en">Heightmap</span>最大高さ (mm)</label><input type="number" id="heightmapH" min="0" step="0.01" placeholder="1.2"></div>
+        <div class="form-row"><label for="baseH"><span class="en">Base</span>最大高さ (mm)</label><input type="number" id="baseH" min="0" step="0.01" placeholder="1.0"></div>
+        <div class="form-row"><label for="texH"><span class="en">Texture</span>最大高さ (mm)</label><input type="number" id="texH" min="0" step="0.01" placeholder="0.2"></div>
+        <div class="form-row"><label for="expires"><span class="en">Expires</span>有効期限（日・空欄で無期限）</label><input type="number" id="expires" min="1" step="1" placeholder="例）30"></div>
+      </div>
+
+      <div class="drop-grid">
+        <label class="drop" data-name="heightmap.png"><span class="req">Heightmap</span><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Heightmap</b><small>heightmap.png｜ハイトマップ（白=高）</small></span></label>
+        <label class="drop" data-name="base.png"><span class="req">Layer Base</span><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Base</b><small>base.png｜大きな立体形状</small></span></label>
+        <label class="drop" data-name="texture.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Texture</b><small>texture.png｜細かな凹凸</small></span></label>
+        <label class="drop" data-name="color.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Color</b><small>color.png｜表面の色</small></span></label>
+        <label class="drop" data-name="varnish.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Varnish</b><small>varnish.png｜艶（白 = ニスあり）</small></span></label>
+        <label class="drop" data-name="original.png"><input type="file" accept="image/png,image/jpeg,image/webp"><span class="drop-label"><b>Original</b><small>original.png｜元画像</small></span></label>
+        <label class="drop" data-name="config.json"><input type="file" accept="application/json,.json"><span class="drop-label"><b>Config</b><small>config.json｜印刷条件（任意）</small></span></label>
+      </div>
+      <p class="status">ハイトマップ（heightmap.png）またはレイヤーデータ（base / texture / color / varnish）をアップロードできます。ファイルをまとめてこのエリアにドラッグ＆ドロップすると自動で振り分けます。</p>
+
+      <div class="actions">
+        <button class="btn-line is-solid" id="submitBtn"><span>Create Link</span><small>共有リンクを発行</small></button>
+        <button class="btn-line" id="resetBtn" type="button"><span>Reset</span><small>クリア</small></button>
+      </div>
+      <p class="status" id="status"></p>
+
+      <div class="result" id="result">
+        <span class="label-en">Share URL｜共有リンク</span>
+        <div class="link-row">
+          <input type="text" id="shareUrl" readonly>
+          <button id="copyBtn">COPY</button>
+          <a id="openBtn" target="_blank" rel="noopener noreferrer">OPEN</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="en">Links</span><span class="ja">発行済みリンク</span></h2>
+      <table class="list">
+        <thead><tr><th>Date</th><th>Title</th><th>Files</th><th></th></tr></thead>
+        <tbody id="list"></tbody>
+      </table>
+      <p class="empty" id="empty" hidden>まだリンクはありません。</p>
+    </section>
   </div>
 </div>
+<script src="/static/js/admin.js"></script>
 </body>
 </html>
