@@ -19,7 +19,6 @@ const PRIVATE_HEADERS = {
   "Cache-Control": "private, no-store",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "SAMEORIGIN",
   "X-Robots-Tag": "noindex, nofollow, noarchive",
 };
 

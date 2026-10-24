@@ -60,7 +60,6 @@ GLB_MAGIC = b"glTF"
 COMMON_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",  # 共有URLが外部サイトへ漏れないように
-    "X-Frame-Options": "SAMEORIGIN",
 }
 PRIVATE_HEADERS = {
     "X-Robots-Tag": "noindex, nofollow, noarchive",
