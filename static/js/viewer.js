@@ -20,7 +20,7 @@ const PREVIEW_QUALITY = (() => {
 const QUALITY_LIMITS = {
   low: {
     fieldMax: IS_MOBILE ? 1024 : 2048,
-    gridMax: IS_MOBILE ? 256 : 512,
+    gridMax: IS_MOBILE ? 512 : 1024,
     colorMax: IS_MOBILE ? 2048 : 4096,
   },
   high: {
@@ -32,9 +32,9 @@ const QUALITY_LIMITS = {
 const { fieldMax: FIELD_MAX, gridMax: GRID_MAX, colorMax: COLOR_MAX } = QUALITY_LIMITS[PREVIEW_QUALITY];
 
 const DEFAULT_LAYER = {
-  heightmap: { max_height_mm: 1.2 },
-  base: { max_height_mm: 1.0 },
-  texture: { max_height_mm: 0.2 },
+  heightmap: { max_height_mm: 3.0 },
+  base: { max_height_mm: 1.5 },
+  texture: { max_height_mm: 0.25 },
   varnish: { max_height_mm: 0 },
   color: {},
 };
@@ -61,7 +61,7 @@ const state = {
   textureOn: true,
   shadowOn: true,
   aoOn: true,
-  realPrintSim: true,   // 実機シミュレーション（盛り下がり・エッジダレ・硬化収縮再現）
+  realPrintSim: false,   // 実機シミュレーション（初期値OFF：BR-T本来の高精度立体形状を表示）
   varnishOn: true,
   mode: 'color',
 };
@@ -376,7 +376,15 @@ function composeHeight() {
 
   const add = (name) => {
     const f = state.fields[name];
-    const mm = Number(layerCfg(name).max_height_mm) || 0;
+    let mm = Number(layerCfg(name).max_height_mm) || 0;
+    if (name === 'heightmap') {
+      const cfgMax = Number(state.config.max_height_mm);
+      if (cfgMax) {
+        mm = cfgMax;
+      } else if (!state.config.layers?.heightmap) {
+        mm = 3.0;
+      }
+    }
     if (!f || !mm) return;
     for (let i = 0; i < n; i++) raw[i] += f[i] * mm;
   };
@@ -444,8 +452,9 @@ function buildNormalMap(exag) {
 
 function buildGeometry() {
   const aspect = state.widthMm / state.heightMm;
-  const sx = aspect >= 1 ? GRID_MAX : Math.max(2, Math.round(GRID_MAX * aspect));
-  const sy = aspect >= 1 ? Math.max(2, Math.round(GRID_MAX / aspect)) : GRID_MAX;
+  const targetGrid = Math.min(Math.max(state.W, state.H), GRID_MAX);
+  const sx = aspect >= 1 ? targetGrid : Math.max(2, Math.round(targetGrid * aspect));
+  const sy = aspect >= 1 ? Math.max(2, Math.round(targetGrid / aspect)) : targetGrid;
   geo = new THREE.PlaneGeometry(state.widthMm, state.heightMm, sx, sy);
   geo.userData = { sx, sy };
 
@@ -483,6 +492,7 @@ function updateGeometry() {
     }
   }
   pos.needsUpdate = true;
+  geo.computeVertexNormals();
   geo.computeBoundingBox();
   geo.computeBoundingSphere();
 
@@ -1119,8 +1129,8 @@ async function main() {
   const ref = state.imgs.heightmap || state.imgs.base || state.imgs.color || state.imgs.original || state.imgs.texture || state.imgs.varnish;
   const imgAspect = ref.naturalWidth / ref.naturalHeight;
   const size = state.config.size_mm || {};
-  state.widthMm = +size.width || (size.height ? +size.height * imgAspect : 300);
-  state.heightMm = +size.height || state.widthMm / imgAspect;
+  state.widthMm = +size.width || 300;
+  state.heightMm = Math.round((state.widthMm / imgAspect) * 10) / 10;
   const [W, H] = fitSize(ref.naturalWidth, ref.naturalHeight, FIELD_MAX);
   state.W = W; state.H = H;
 
@@ -1165,7 +1175,7 @@ async function main() {
     roughness: 0.58,
     metalness: 0,
     normalMap: normalTex,
-    normalScale: new THREE.Vector2(0.35, 0.35),
+    normalScale: new THREE.Vector2(0.85, 0.85),
     clearcoat: varnishTex ? 0.04 : 0,
     clearcoatMap: varnishTex || null,
     clearcoatRoughness: 0.35,

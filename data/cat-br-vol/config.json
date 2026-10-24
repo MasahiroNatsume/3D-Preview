@@ -1,0 +1,32 @@
+{
+  "title": "猫サンプル [BR-Vol 深度融合版 +30%立体感]",
+  "size_mm": {
+    "width": 280.0,
+    "height": 280.0
+  },
+  "white_is_high": true,
+  "board": {
+    "thickness_mm": 3.0,
+    "color": "#fafafa"
+  },
+  "layers": {
+    "base": {
+      "ink": "White",
+      "density_percent": 900,
+      "passes": 9,
+      "max_height_mm": 1.5
+    },
+    "texture": {
+      "ink": "White",
+      "density_percent": 200,
+      "passes": 2,
+      "max_height_mm": 0.25
+    },
+    "color": {
+      "ink": "CMYK",
+      "density_percent": 100,
+      "passes": 1
+    }
+  },
+  "note": "猫サンプル [BR-Vol 深度融合版 +30%立体感] - 実験プレビュー"
+}

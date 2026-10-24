@@ -1,0 +1,11 @@
+{
+  "title": "猫サンプル [BR-T 従来版]",
+  "files": {
+    "original": "files/original.png",
+    "base": "files/base.png",
+    "texture": "files/texture.png",
+    "color": "files/color.png",
+    "heightmap": "files/heightmap.png"
+  },
+  "config": "files/config.json"
+}

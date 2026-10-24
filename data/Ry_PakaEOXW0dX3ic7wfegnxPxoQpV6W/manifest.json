@@ -1,0 +1,11 @@
+{
+  "title": "懐中時計 (Pocket Watch) - 精密金属部品",
+  "files": {
+    "original": "files/original.png",
+    "base": "files/base.png",
+    "texture": "files/texture.png",
+    "color": "files/color.png",
+    "heightmap": "files/heightmap.png"
+  },
+  "config": "files/config.json"
+}

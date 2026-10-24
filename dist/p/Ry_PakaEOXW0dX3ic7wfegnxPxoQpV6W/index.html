@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>厚盛り印刷 3Dプレビュー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body class="viewer">
+
+<header class="site-header">
+  <a class="brand" href="#" onclick="return false">
+    <span class="brand-en">YAMATE-SIGN</span>
+    <span class="brand-ja">厚盛り印刷 3Dプレビュー</span>
+  </a>
+  <div class="header-title">
+    <span class="label-en">Project</span>
+    <span class="header-project" id="projectTitle">厚盛り印刷 3Dプレビュー</span>
+  </div>
+  <button class="panel-toggle" id="panelToggle" aria-label="設定パネル">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+<div class="grad-line"></div>
+
+<main class="stage">
+  <div class="canvas-wrap" id="canvasWrap"></div>
+
+  <!-- 視点ツールバー -->
+  <div class="view-bar" role="toolbar">
+    <button data-view="home" title="ホーム視点 (0)"><span class="en">Home</span><span class="ja">斜め</span></button>
+    <button data-view="front" title="正面 (1)"><span class="en">Front</span><span class="ja">正面</span></button>
+    <button data-view="right" title="側面 (3)"><span class="en">Side</span><span class="ja">側面</span></button>
+    <button data-view="top" title="上面 (7)"><span class="en">Top</span><span class="ja">上面</span></button>
+    <button data-view="frame" title="全体表示 (.)"><span class="en">Fit</span><span class="ja">全体</span></button>
+    <button data-view="ortho" id="orthoBtn" title="透視 / 平行投影 (5)"><span class="en" id="orthoLabel">Persp</span><span class="ja">投影</span></button>
+  </div>
+
+  <!-- 操作方法 -->
+  <details class="help" id="help" open>
+    <summary><span class="en">Controls</span><span class="ja">操作方法</span></summary>
+    <div class="help-body">
+      <table>
+        <tr><th colspan="2">Mouse <small>マウス</small></th></tr>
+        <tr><td>中ボタン / 左ドラッグ</td><td>回転</td></tr>
+        <tr><td>Shift + 中ボタン / 右ドラッグ</td><td>移動</td></tr>
+        <tr><td>ホイール / Ctrl + 中ボタン</td><td>拡大・縮小</td></tr>
+        <tr><th colspan="2">Trackpad <small>トラックパッド</small></th></tr>
+        <tr><td>2本指スライド</td><td>回転</td></tr>
+        <tr><td>Shift + 2本指スライド</td><td>移動</td></tr>
+        <tr><td>ピンチ / Ctrl + 2本指</td><td>拡大・縮小</td></tr>
+        <tr><th colspan="2">Touch <small>タッチ</small></th></tr>
+        <tr><td>1本指</td><td>回転</td></tr>
+        <tr><td>2本指</td><td>移動・拡大縮小</td></tr>
+        <tr><th colspan="2">Keys <small>キー（テンキー対応）</small></th></tr>
+        <tr><td>1 / 3 / 7</td><td>正面 / 側面 / 上面</td></tr>
+        <tr><td>5</td><td>透視 ⇄ 平行投影</td></tr>
+        <tr><td>2 4 6 8</td><td>15°ずつ回転</td></tr>
+        <tr><td>. / Home &nbsp; 0</td><td>全体表示 &nbsp; ホーム</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <p class="disclaimer">※ 画面上の色味は完成品の色を保証するものではありません。高さ・盛り上げ位置・立体感の確認用です。</p>
+
+  <!-- 設定パネル -->
+  <aside class="panel" id="panel">
+    <section class="panel-sec">
+      <h2 class="sec-title"><span class="en">Display</span><span class="ja">表示</span></h2>
+      <div class="seg" id="displayMode">
+        <button data-mode="color" class="is-active">カラー</button>
+        <button data-mode="original">元画像</button>
+        <button data-mode="clay" title="テクスチャを非表示にして物理的な凹凸形状を確認">立体形状</button>
+        <button data-mode="height">高さ</button>
+      </div>
+      <label class="check is-sim" id="realPrintLabel"><input type="checkbox" id="realPrintToggle"><span>実高さ補正（ON：インクの沈み込み／OFF：入力値）</span></label>
+      <label class="check"><input type="checkbox" id="shadowToggle" checked><span>リアルな影（シャドウ）</span></label>
+      <label class="check"><input type="checkbox" id="aoToggle" checked><span>溝の陰影（AO）</span></label>
+      <label class="check"><input type="checkbox" id="textureToggle" checked><span>テクスチャ（細かな凹凸）</span></label>
+      <label class="check"><input type="checkbox" id="boardToggle" checked><span>基材を表示</span></label>
+    </section>
+
+    <section class="panel-sec" id="previewQualitySec">
+      <h2 class="sec-title"><span class="en">Preview Detail</span><span class="ja">表示解像度</span></h2>
+      <div class="seg" id="previewQuality" role="group" aria-label="プレビュー解像度">
+        <button type="button" data-quality="low" class="is-active" aria-pressed="true">低</button>
+        <button type="button" data-quality="high" aria-pressed="false">高</button>
+      </div>
+      <p class="note" id="qualityNote"></p>
+    </section>
+
+    <section class="panel-sec">
+      <h2 class="sec-title"><span class="en">Height</span><span class="ja">高さ</span></h2>
+      <div class="range">
+        <div class="range-head"><span>高さ強調</span><output id="exagOut">×1.00（実寸）</output></div>
+        <div class="range-control">
+          <button type="button" class="btn-step" id="exagMinus" title="0.05下げる">−</button>
+          <input type="range" id="exag" min="0" max="2" step="0.01" value="1">
+          <button type="button" class="btn-step" id="exagPlus" title="0.05上げる">+</button>
+        </div>
+      </div>
+      <p class="note" id="heightNote"></p>
+    </section>
+
+    <section class="panel-sec">
+      <h2 class="sec-title"><span class="en">Light</span><span class="ja">ライト</span></h2>
+      <div class="range">
+        <div class="range-head"><span>方向</span><output id="lightAzOut"></output></div>
+        <input type="range" id="lightAz" min="-180" max="180" step="1" value="-35">
+      </div>
+      <div class="range">
+        <div class="range-head"><span>高さ</span><output id="lightElOut"></output></div>
+        <input type="range" id="lightEl" min="5" max="90" step="1" value="40">
+      </div>
+      <div class="range">
+        <div class="range-head"><span>明るさ</span><output id="lightIntOut"></output></div>
+        <input type="range" id="lightInt" min="0" max="4" step="0.05" value="1.6">
+      </div>
+      <label class="check"><input type="checkbox" id="lightFollow"><span>カメラに追従</span></label>
+    </section>
+
+    <section class="panel-sec">
+      <h2 class="sec-title"><span class="en">Scene</span><span class="ja">環境</span></h2>
+      <div class="seg" id="bgMode">
+        <button data-bg="light" class="is-active">ライト</button>
+        <button data-bg="dark">ダーク</button>
+      </div>
+      <div class="field">
+        <span>ホイール操作</span>
+        <select id="wheelMode">
+          <option value="auto">自動判定</option>
+          <option value="mouse">マウス（ズーム）</option>
+          <option value="trackpad">トラックパッド（回転）</option>
+        </select>
+      </div>
+      <button class="btn-line" id="shotBtn"><span>Screenshot</span><small>画像を保存</small></button>
+    </section>
+
+    <section class="panel-sec" id="specSec" hidden>
+      <h2 class="sec-title"><span class="en">Spec</span><span class="ja">印刷仕様</span></h2>
+      <table class="spec" id="specTable"></table>
+    </section>
+  </aside>
+
+  <div class="loading" id="loading">
+    <div class="loading-inner">
+      <div class="loading-en">Loading</div>
+      <div class="loading-bar"><span id="loadingBar"></span></div>
+      <div class="loading-ja" id="loadingText">データを読み込んでいます…</div>
+    </div>
+  </div>
+</main>
+
+<script type="module" src="/static/js/viewer.js"></script>
+</body>
+</html>

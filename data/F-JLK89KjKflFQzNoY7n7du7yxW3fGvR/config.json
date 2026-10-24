@@ -1,0 +1,33 @@
+{
+  "title": "aloe レリーフ",
+  "size_mm": {
+    "width": 300.0,
+    "height": 259.75
+  },
+  "max_height_mm": 3.0,
+  "white_is_high": true,
+  "board": {
+    "thickness_mm": 3.0,
+    "color": "#fafafa"
+  },
+  "layers": {
+    "base": {
+      "ink": "White",
+      "density_percent": 900,
+      "passes": 9,
+      "max_height_mm": 1.5
+    },
+    "texture": {
+      "ink": "White",
+      "density_percent": 200,
+      "passes": 2,
+      "max_height_mm": 0.25
+    },
+    "color": {
+      "ink": "CMYK",
+      "density_percent": 100,
+      "passes": 1
+    }
+  },
+  "note": "BR-T (Bas-Relief Tuned) 高精度UV厚盛り印刷パイプライン出力"
+}
